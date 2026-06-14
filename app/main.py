@@ -11,8 +11,8 @@ from fastapi.staticfiles import StaticFiles
 
 from .api.routes import router as api_router
 from .db import init_db
+from .migrate import run_migration
 from .scheduler import shutdown_scheduler, start_scheduler
-from .seed import seed_default_searches
 from .web.routes import router as web_router
 
 logging.basicConfig(
@@ -26,7 +26,7 @@ _STATIC_DIR = Path(__file__).parent / "web" / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    seed_default_searches()
+    run_migration()
     start_scheduler()
     try:
         yield
@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
         shutdown_scheduler()
 
 
-app = FastAPI(title="Switch Parts Tracker", lifespan=lifespan)
+app = FastAPI(title="Enklask", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 app.include_router(api_router)
 app.include_router(web_router)

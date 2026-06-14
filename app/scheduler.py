@@ -46,6 +46,16 @@ def shutdown_scheduler() -> None:
         _scheduler = None
 
 
+def reschedule_poll(interval_minutes: int) -> None:
+    if _scheduler is None:
+        return
+    _scheduler.reschedule_job(
+        "poll_sources",
+        trigger=IntervalTrigger(minutes=interval_minutes),
+    )
+    logger.info("Scheduler rescheduled: polling every %d min", interval_minutes)
+
+
 def _safe_poll() -> None:
     try:
         poll_once()

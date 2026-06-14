@@ -1,7 +1,7 @@
 """Push notifications for new listings via Apprise.
 
 Apprise routes a single notification to many services (Telegram, ntfy, Discord,
-email, Pushover, Slack, …) from simple URL strings, so the app stays agnostic
+email, Pushover, Slack, ...) from simple URL strings, so the app stays agnostic
 about where alerts go. Delivery is best-effort and fully isolated: a failure
 here never affects polling or storage.
 """
@@ -18,31 +18,27 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class NotifyItem:
-    """A snapshot of the fields we alert on (decoupled from the ORM session)."""
-
     source: str
     title: str
     url: str
+    topic_name: str = ""
     price: float | None = None
     currency: str = "EUR"
     location_city: str | None = None
     distance_km: float | None = None
-    model_guess: str = "unknown"
-    part_guess: str = "other"
     thumbnail: str | None = None
 
     @classmethod
-    def from_listing(cls, listing) -> "NotifyItem":
+    def from_listing(cls, listing, topic_name: str = "") -> "NotifyItem":
         return cls(
             source=listing.source,
             title=listing.title,
             url=listing.url,
+            topic_name=topic_name,
             price=listing.price,
             currency=listing.currency,
             location_city=listing.location_city,
             distance_km=listing.distance_km,
-            model_guess=listing.model_guess,
-            part_guess=listing.part_guess,
             thumbnail=listing.thumbnail,
         )
 
@@ -67,30 +63,35 @@ class Notifier:
             notify_on_first_run=settings.notify_on_first_run,
         )
 
+    @classmethod
+    def for_topic(cls, topic_urls: list[str], settings: Settings | None = None) -> "Notifier":
+        settings = settings or get_settings()
+        urls = topic_urls if topic_urls else settings.apprise_url_list
+        return cls(
+            urls=urls,
+            max_per_poll=settings.notify_max_per_poll,
+            notify_on_first_run=settings.notify_on_first_run,
+        )
+
     @property
     def enabled(self) -> bool:
         return bool(self._urls)
 
-    # -- formatting ----------------------------------------------------------
     def format_listing(self, item: NotifyItem) -> tuple[str, str]:
         price = f"{item.price:.0f}{item.currency}" if item.price is not None else "?"
-        title = f"🎮 {item.source} · {price} — {item.title[:80]}"
+        prefix = f"[{item.topic_name}] " if item.topic_name else ""
+        title = f"{prefix}{item.source} · {price} — {item.title[:80]}"
 
         lines: list[str] = []
-        tags = [t for t in (item.model_guess, item.part_guess) if t not in ("unknown", "other")]
-        if tags:
-            lines.append(" · ".join(tags))
         if item.location_city:
-            loc = f"📍 {item.location_city}"
+            loc = f"\U0001f4cd {item.location_city}"
             if item.distance_km is not None:
                 loc += f" ({item.distance_km:.0f} km)"
             lines.append(loc)
         lines.append(item.url)
         return title, "\n".join(lines)
 
-    # -- sending -------------------------------------------------------------
     def notify_new(self, items: list[NotifyItem], is_cold_start: bool = False) -> int:
-        """Notify about newly-discovered listings. Returns messages sent."""
         if not self.enabled or not items:
             return 0
         if is_cold_start and not self._notify_on_first_run:
@@ -111,14 +112,16 @@ class Notifier:
                 sent += 1
         return sent
 
-    def send_test(self) -> bool:
+    def send_test(self, topic_name: str = "") -> bool:
+        label = f"[{topic_name}] " if topic_name else ""
         return self._send(
-            "🎮 Switch Parts Tracker",
+            f"{label}Enklask",
             "Test de notification — si tu vois ça, Apprise est bien configuré ✅",
         )
 
     def _format_digest(self, items: list[NotifyItem]) -> tuple[str, str]:
-        title = f"🎮 {len(items)} nouvelles annonces Switch"
+        topic = items[0].topic_name if items[0].topic_name else "Enklask"
+        title = f"[{topic}] {len(items)} nouvelles annonces"
         shown = items[: self._max_per_poll]
         lines = []
         for it in shown:
@@ -129,10 +132,9 @@ class Notifier:
         return title, "\n".join(lines)
 
     def _send(self, title: str, body: str, attach: list[str] | None = None) -> bool:
-        """Deliver one notification. Never raises — logs and returns False on error."""
         try:
             import apprise
-        except ImportError:  # pragma: no cover
+        except ImportError:
             logger.warning("apprise is not installed; cannot send notifications.")
             return False
         try:
@@ -143,7 +145,5 @@ class Notifier:
         except (KeyboardInterrupt, SystemExit):
             raise
         except BaseException:
-            # Catch broadly (incl. native panics from optional Apprise plugin
-            # deps) so a notification failure can never break a background poll.
             logger.exception("Failed to send notification")
             return False
