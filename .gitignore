@@ -14,6 +14,10 @@ venv/
 data/
 .env
 
+# Browser cookie exports & sessions (sensitive credentials — never commit)
+*cookies*.txt
+*_state.json
+
 # OS / editor
 .DS_Store
 .idea/

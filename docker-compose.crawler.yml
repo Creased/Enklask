@@ -1,0 +1,24 @@
+# Standalone crawler service for an isolated/headless host (e.g. Raspberry Pi).
+# Kept separate from the main app's docker-compose.yml.
+#
+# Build:   docker compose -f docker-compose.crawler.yml build
+# Run a search (one-shot):
+#   LBC_DATADOME='<cookie>' docker compose -f docker-compose.crawler.yml \
+#       run --rm crawler "nintendo switch" --price-max 200 --pages 3 --json
+#
+# Or keep the cookie in an .env file next to this compose (LBC_DATADOME=...).
+services:
+  crawler:
+    build:
+      context: .
+      dockerfile: Dockerfile.crawler
+    image: lbc-crawler
+    environment:
+      # Supply ONE of these (cookie minted in a real desktop browser):
+      - LBC_DATADOME=${LBC_DATADOME:-}
+      # ...or point at a mounted Netscape cookies.txt instead:
+      - LBC_COOKIES=${LBC_COOKIES:-}
+    volumes:
+      - ./data:/app/data        # persists leboncoin_state.json + your cookies.txt
+    # No ports, no restart: this is a run-on-demand CLI. Override the command:
+    #   docker compose -f docker-compose.crawler.yml run --rm crawler "velo" --pages 5

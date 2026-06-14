@@ -5,7 +5,11 @@ SQLAlchemy==2.0.36
 pydantic==2.10.4
 pydantic-settings==2.7.1
 httpx==0.28.1
+# Browser-TLS impersonation — the Leboncoin DataDome bypass (no browser needed).
+curl_cffi>=0.7,<1.0
 APScheduler==3.11.0
+# Time-zone database (slim images ship none) for normalizing source dates.
+tzdata==2025.2
 Jinja2==3.1.5
 python-multipart==0.0.20
 apprise==1.9.1

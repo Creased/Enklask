@@ -1,3 +1,10 @@
+# Slim image — no browser needed. curl_cffi (in requirements.txt) impersonates a
+# real browser's TLS/HTTP2 fingerprint, so Vinted, eBay and Leboncoin all crawl
+# over plain HTTP past their bot checks. No Playwright/Chromium/Xvfb.
+#
+# (Facebook Marketplace is the only source that still needs a browser; it imports
+# Playwright lazily and is off by default. To use it: install
+# requirements-scrapers.txt and run `playwright install chromium`.)
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -5,7 +12,6 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Install core dependencies first for better layer caching.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
