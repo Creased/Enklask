@@ -1,17 +1,24 @@
-"""Application settings, loaded from environment / `.env`."""
+"""Application settings, loaded from ``data/config.json``."""
 
 from __future__ import annotations
 
-from functools import lru_cache
+import json
+import logging
+import threading
+from pathlib import Path
+from typing import Any
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
+
+CONFIG_PATH = Path("data/config.json")
+
+_lock = threading.Lock()
+_cached_settings: Settings | None = None
 
 
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
-    )
-
+class Settings(BaseModel):
     # Storage
     database_url: str = "sqlite:///data/ad_tracker.db"
 
@@ -23,7 +30,7 @@ class Settings(BaseSettings):
     home_lon: float = -1.6778
 
     # Source toggles
-    enable_ebay: bool = True
+    enable_ebay: bool = False
     enable_vinted: bool = False
     enable_leboncoin: bool = False
     enable_facebook: bool = False
@@ -45,15 +52,17 @@ class Settings(BaseSettings):
     facebook_storage_state: str = "data/facebook_state.json"
     facebook_city: str = "rennes"
 
-    # Rakuten France (unofficial; the official Product Search API excludes used/C2C)
+    # Rakuten France
     rakuten_base_url: str = "https://fr.shopping.rakuten.com"
 
-    # Geev (unofficial internal API; great for free/cheap local donor units)
+    # Geev
     geev_base_url: str = "https://prod.geev.fr"
     geev_web_base: str = "https://www.geev.com"
     geev_api_key: str = ""
-    # Search radius (km) around home for Geev's geo search.
     geev_radius_km: int = 50
+
+    # Shared cookies.txt file (Netscape format, e.g. from "Get cookies.txt LOCALLY").
+    cookies_file: str = "data/cookies.txt"
 
     # Notifications (Apprise). One or more URLs, comma or whitespace separated.
     apprise_urls: str = ""
@@ -62,11 +71,48 @@ class Settings(BaseSettings):
 
     @property
     def apprise_url_list(self) -> list[str]:
-        """Parse ``apprise_urls`` into a clean list (comma/whitespace separated)."""
         raw = self.apprise_urls.replace(",", " ")
         return [u.strip() for u in raw.split() if u.strip()]
 
 
-@lru_cache
+def _load_from_file() -> dict[str, Any]:
+    if CONFIG_PATH.exists():
+        return json.loads(CONFIG_PATH.read_text("utf-8"))
+    return {}
+
+
+def _write_to_file(data: dict[str, Any]) -> None:
+    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    CONFIG_PATH.write_text(json.dumps(data, indent=2, ensure_ascii=False), "utf-8")
+
+
 def get_settings() -> Settings:
-    return Settings()
+    global _cached_settings
+    with _lock:
+        if _cached_settings is None:
+            raw = _load_from_file()
+            _cached_settings = Settings(**raw)
+            if not CONFIG_PATH.exists():
+                _write_to_file(_cached_settings.model_dump())
+        return _cached_settings
+
+
+def save_settings(updates: dict[str, Any]) -> Settings:
+    global _cached_settings
+    with _lock:
+        current = _load_from_file()
+        valid_fields = set(Settings.model_fields)
+        for key, value in updates.items():
+            if key in valid_fields:
+                current[key] = value
+        new_settings = Settings(**current)
+        _write_to_file(new_settings.model_dump())
+        _cached_settings = new_settings
+        return new_settings
+
+
+def reload_settings() -> Settings:
+    global _cached_settings
+    with _lock:
+        _cached_settings = None
+    return get_settings()

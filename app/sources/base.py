@@ -29,22 +29,35 @@ class RawListing:
     location_city: str | None = None
     lat: float | None = None
     lon: float | None = None
+    distance_km: float | None = None
     shipping_options: list[str] = field(default_factory=list)
     posted_at: datetime | None = None
 
 
 class SearchQuery:
-    """Lightweight view over a SavedSearch passed to adapters."""
+    """Lightweight view over a SavedSearch passed to adapters.
+
+    Filters here are translated by each adapter into that marketplace's own
+    native query parameters, so the crawl itself is filtered (not the results
+    after the fact). ``condition`` is a generic bucket each adapter maps to its
+    own codes; ``sort`` is one of relevance/recent/oldest/price_asc/price_desc.
+    """
 
     def __init__(
         self,
         query: str,
+        price_min: float | None = None,
         price_max: float | None = None,
         max_distance_km: float | None = None,
+        condition: str | None = None,
+        sort: str = "recent",
     ) -> None:
         self.query = query
+        self.price_min = price_min
         self.price_max = price_max
         self.max_distance_km = max_distance_km
+        self.condition = condition
+        self.sort = sort
 
 
 class BaseSource(abc.ABC):
