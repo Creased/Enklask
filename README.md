@@ -27,12 +27,12 @@ location and searches are configurable.
 
 ## Source status
 
-| Source              | Access                         | Status      |
-|---------------------|--------------------------------|-------------|
-| eBay                | Official Browse API            | ✅ Phase 1  |
-| Vinted              | Unofficial internal JSON API   | 🔜 Phase 2  |
-| Leboncoin           | Unofficial API (DataDome)      | 🔜 Phase 3  |
-| Facebook Marketplace| Headless browser (logged-in)   | 🔜 Phase 4  |
+| Source              | Access                         | Status                          |
+|---------------------|--------------------------------|---------------------------------|
+| eBay                | Official Browse API            | ✅ Stable                       |
+| Vinted              | Unofficial internal JSON API   | ✅ Works (may break on changes) |
+| Leboncoin           | Unofficial API (DataDome)      | ⚠️ Best effort (may be blocked) |
+| Facebook Marketplace| Headless browser (logged-in)   | 🧪 Experimental (opt-in)        |
 
 ## Quick start (local)
 
@@ -86,8 +86,20 @@ pytest
 Covers the taxonomy classifier, dedup/upsert logic, and the eBay response parser
 (no live network needed).
 
+### Enabling the unofficial sources
+
+- **Vinted** — set `ENABLE_VINTED=true`. No credentials; cookies are bootstrapped
+  automatically. If it stops returning results, Vinted likely changed its internal API.
+- **Leboncoin** — set `ENABLE_LEBONCOIN=true`. May be blocked by DataDome; if so the
+  source reports an error and the others keep working. A Playwright fallback / residential
+  proxy can be added later.
+- **Facebook Marketplace** — set `ENABLE_FACEBOOK=true`, install the scraper deps
+  (`pip install -r requirements-scrapers.txt && playwright install chromium`), and export a
+  logged-in session to the path in `FACEBOOK_STORAGE_STATE` (a Playwright `storage_state`
+  JSON). Off until that file exists. Most fragile / ToS-sensitive — use sparingly.
+
 ## Roadmap
 
-- Phase 2–4: Vinted, Leboncoin, Facebook Marketplace adapters.
 - Telegram push notifications for new matches (currently dashboard-only).
-- Saved-search management UI and per-source health indicators.
+- Saved-search management UI in the dashboard.
+- Playwright fallback for Leboncoin when DataDome blocks the JSON API.

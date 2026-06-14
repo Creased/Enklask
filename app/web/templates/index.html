@@ -1,6 +1,17 @@
 {% extends "base.html" %}
 {% block content %}
 
+<div class="mb-4 text-sm text-slate-600 flex items-center gap-2 flex-wrap">
+  <span class="font-medium">Sources actives :</span>
+  {% if enabled_sources %}
+    {% for src in enabled_sources %}
+    <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs">{{ src }}</span>
+    {% endfor %}
+  {% else %}
+    <span class="text-amber-600">Aucune source configurée — renseigne tes clés dans <code>.env</code>.</span>
+  {% endif %}
+</div>
+
 <form
   class="bg-white rounded-lg shadow-sm p-4 mb-6 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 text-sm"
   hx-get="/partials/listings"

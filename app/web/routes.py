@@ -14,6 +14,7 @@ from ..db import get_session
 from ..enums import ConsoleModel, ListingStatus, PartType, Source
 from ..models import Listing
 from ..poller import poll_once
+from ..sources.registry import get_enabled_sources
 
 router = APIRouter(tags=["web"])
 
@@ -72,6 +73,7 @@ def dashboard(request: Request, session: Session = Depends(get_session)):
         "request": request,
         "listings": listings,
         "selected": filters,
+        "enabled_sources": [s.name.value for s in get_enabled_sources()],
         **_filter_context(),
     }
     return templates.TemplateResponse("index.html", context)
