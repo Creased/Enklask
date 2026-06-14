@@ -1,0 +1,10 @@
+[project]
+name = "ad-tracker"
+version = "0.1.0"
+description = "Multi-marketplace tracker for Nintendo Switch parts (V1/V2/Lite/OLED)."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"

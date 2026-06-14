@@ -1,0 +1,68 @@
+{% set source_colors = {
+  "ebay": "bg-blue-100 text-blue-700",
+  "vinted": "bg-teal-100 text-teal-700",
+  "leboncoin": "bg-orange-100 text-orange-700",
+  "facebook": "bg-indigo-100 text-indigo-700"
+} %}
+<div id="card-{{ listing.id }}"
+     class="bg-white rounded-lg shadow-sm overflow-hidden flex flex-col
+            {% if listing.status == 'liked' %}ring-2 ring-emerald-400{% endif %}">
+  <a href="{{ listing.url }}" target="_blank" rel="noopener" class="block bg-slate-200 aspect-[4/3] overflow-hidden">
+    {% if listing.thumbnail %}
+    <img src="{{ listing.thumbnail }}" alt="" loading="lazy"
+         class="w-full h-full object-cover hover:scale-105 transition-transform" />
+    {% else %}
+    <div class="w-full h-full flex items-center justify-center text-slate-400 text-4xl">🎮</div>
+    {% endif %}
+  </a>
+
+  <div class="p-3 flex flex-col gap-2 flex-1">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-xs font-semibold px-2 py-0.5 rounded {{ source_colors.get(listing.source, 'bg-slate-100 text-slate-600') }}">
+        {{ listing.source }}
+      </span>
+      {% if listing.price is not none %}
+      <span class="text-base font-bold text-slate-900">{{ "%.0f"|format(listing.price) }} {{ listing.currency }}</span>
+      {% endif %}
+    </div>
+
+    <a href="{{ listing.url }}" target="_blank" rel="noopener"
+       class="text-sm font-medium text-slate-800 line-clamp-2 hover:underline">
+      {{ listing.title }}
+    </a>
+
+    <div class="flex flex-wrap gap-1 text-[11px]">
+      {% if listing.model_guess and listing.model_guess != 'unknown' %}
+      <span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">{{ listing.model_guess }}</span>
+      {% endif %}
+      {% if listing.part_guess and listing.part_guess != 'other' %}
+      <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{{ listing.part_guess }}</span>
+      {% endif %}
+      {% for ship in listing.shipping_options %}
+      <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{{ ship }}</span>
+      {% endfor %}
+    </div>
+
+    <div class="text-xs text-slate-500 mt-auto">
+      {% if listing.location_city %}📍 {{ listing.location_city }}{% endif %}
+      {% if listing.distance_km is not none %} · {{ "%.0f"|format(listing.distance_km) }} km{% endif %}
+    </div>
+
+    <div class="flex gap-2 pt-1">
+      <a href="{{ listing.url }}" target="_blank" rel="noopener"
+         class="flex-1 text-center text-xs font-medium bg-slate-900 text-white rounded px-2 py-1.5 hover:bg-slate-700">
+        Voir l'annonce ↗
+      </a>
+      <button title="J'aime"
+              class="text-sm px-2 py-1.5 rounded border hover:bg-emerald-50"
+              hx-post="/partials/listings/{{ listing.id }}/status"
+              hx-vals='{"value": "liked"}'
+              hx-target="#card-{{ listing.id }}" hx-swap="outerHTML">❤️</button>
+      <button title="Masquer"
+              class="text-sm px-2 py-1.5 rounded border hover:bg-red-50"
+              hx-post="/partials/listings/{{ listing.id }}/status"
+              hx-vals='{"value": "hidden"}'
+              hx-target="#card-{{ listing.id }}" hx-swap="outerHTML">🚫</button>
+    </div>
+  </div>
+</div>

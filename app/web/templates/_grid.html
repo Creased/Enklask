@@ -1,0 +1,11 @@
+{% if listings %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+  {% for listing in listings %}
+    {% include "_card.html" %}
+  {% endfor %}
+</div>
+{% else %}
+<div class="text-center text-slate-500 py-16">
+  Aucune annonce pour ces filtres. Lance un « Rafraîchir » ou élargis la recherche.
+</div>
+{% endif %}

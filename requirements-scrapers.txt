@@ -1,0 +1,5 @@
+# Optional, heavier dependencies for browser-based sources
+# (Leboncoin DataDome fallback + Facebook Marketplace).
+# Install with: pip install -r requirements-scrapers.txt
+#   then: playwright install chromium
+playwright==1.49.1
