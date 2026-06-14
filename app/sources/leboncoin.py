@@ -1,17 +1,24 @@
-"""Leboncoin source adapter (unofficial internal API).
+"""Leboncoin source adapter (unofficial internal API + browser fallback).
 
 Leboncoin exposes no public API. Its site/app call ``/finder/search`` on
 ``api.leboncoin.fr``, which is protected by DataDome anti-bot. This adapter is
-**best effort**: it tries the JSON API with browser-like headers and, if it gets
-blocked, raises a clear error (the poller records it and keeps other sources
-running). A Playwright fallback can be added when the optional scraper deps are
-installed.
+**best effort**:
+
+1. It first tries the JSON API with browser-like headers.
+2. If DataDome blocks that call and Playwright is installed, it falls back to a
+   real headless browser that renders the search page and extracts ads from the
+   embedded ``__NEXT_DATA__`` JSON.
+3. If both fail, it raises a clear error; the poller records it and keeps the
+   other sources running.
 """
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 from datetime import datetime
+from urllib.parse import quote
 
 import httpx
 
@@ -31,6 +38,16 @@ _USER_AGENT = (
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 )
 
+_WEB_BASE = "https://www.leboncoin.fr"
+_NEXT_DATA_RE = re.compile(
+    r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>',
+    re.DOTALL,
+)
+
+
+class DataDomeBlocked(RuntimeError):
+    """Raised when the JSON API is blocked by DataDome anti-bot."""
+
 
 class LeboncoinSource(BaseSource):
     name = Source.LEBONCOIN
@@ -44,6 +61,14 @@ class LeboncoinSource(BaseSource):
         return bool(self._settings.enable_leboncoin)
 
     def search(self, query: SearchQuery) -> list[RawListing]:
+        try:
+            return self._search_api(query)
+        except DataDomeBlocked as exc:
+            logger.info("Leboncoin API blocked, trying browser fallback: %s", exc)
+            return self._search_browser(query)
+
+    # -- 1) JSON API ---------------------------------------------------------
+    def _search_api(self, query: SearchQuery) -> list[RawListing]:
         payload: dict = {
             "filters": {
                 "enums": {"ad_type": ["offer"]},
@@ -61,8 +86,8 @@ class LeboncoinSource(BaseSource):
             "Accept": "application/json",
             "Content-Type": "application/json",
             "api_key": _API_KEY,
-            "Origin": "https://www.leboncoin.fr",
-            "Referer": "https://www.leboncoin.fr/",
+            "Origin": _WEB_BASE,
+            "Referer": f"{_WEB_BASE}/",
         }
         resp = httpx.post(
             f"{self._base}/finder/search",
@@ -71,14 +96,47 @@ class LeboncoinSource(BaseSource):
             timeout=30.0,
         )
         if resp.status_code in (401, 403) or "datadome" in resp.text.lower():
-            raise RuntimeError(
-                "Leboncoin blocked the request (DataDome). A Playwright fallback "
-                "or residential proxy is needed — see requirements-scrapers.txt."
-            )
+            raise DataDomeBlocked(f"HTTP {resp.status_code}")
         resp.raise_for_status()
         ads = resp.json().get("ads", []) or []
         return [self._to_raw(ad) for ad in ads]
 
+    # -- 2) Playwright browser fallback --------------------------------------
+    def _search_browser(self, query: SearchQuery) -> list[RawListing]:
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError(
+                "Leboncoin blocked by DataDome and Playwright is not installed. "
+                "Install requirements-scrapers.txt and run "
+                "`playwright install chromium` to enable the browser fallback."
+            ) from exc
+
+        url = f"{_WEB_BASE}/recherche?text={quote(query.query)}&sort=time"
+        if query.price_max:
+            url += f"&price=min-{int(query.price_max)}"
+
+        html = ""
+        with sync_playwright() as p:  # pragma: no cover - needs a browser
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                user_agent=_USER_AGENT, locale="fr-FR"
+            )
+            page = context.new_page()
+            page.goto(url, wait_until="domcontentloaded", timeout=45000)
+            page.wait_for_timeout(3000)
+            html = page.content()
+            browser.close()
+
+        ads = _extract_ads_from_html(html)
+        if not ads:
+            raise RuntimeError(
+                "Leboncoin browser fallback returned no ads (page may still be "
+                "challenged by DataDome, or the markup changed)."
+            )
+        return [self._to_raw(ad) for ad in ads]
+
+    # -- shared parsing ------------------------------------------------------
     def _to_raw(self, ad: dict) -> RawListing:
         images = ad.get("images") or {}
         urls = images.get("urls") or []
@@ -87,13 +145,16 @@ class LeboncoinSource(BaseSource):
         location = ad.get("location") or {}
         body = ad.get("body", "") or ""
         subject = ad.get("subject", "") or ""
+        url = ad.get("url", "") or ""
+        if url and url.startswith("/"):
+            url = f"{_WEB_BASE}{url}"
 
         return RawListing(
             source=Source.LEBONCOIN,
             source_id=str(ad.get("list_id", "")),
             title=subject,
             description=body,
-            url=ad.get("url", ""),
+            url=url,
             price=_first_price(ad.get("price")),
             currency="EUR",
             thumbnail=thumb,
@@ -104,6 +165,41 @@ class LeboncoinSource(BaseSource):
             shipping_options=detect_shipping(subject, body),
             posted_at=_parse_date(ad.get("first_publication_date")),
         )
+
+
+def _extract_ads_from_html(html: str) -> list[dict]:
+    """Pull ad dicts out of the page's embedded ``__NEXT_DATA__`` JSON."""
+    match = _NEXT_DATA_RE.search(html or "")
+    if not match:
+        return []
+    try:
+        data = json.loads(match.group(1))
+    except json.JSONDecodeError:
+        return []
+    return _find_ads(data)
+
+
+def _find_ads(node, seen: set | None = None) -> list[dict]:
+    """Recursively collect objects that look like Leboncoin ads.
+
+    Resilient to layout changes: any dict carrying both ``list_id`` and
+    ``subject`` is treated as an ad, deduplicated by ``list_id``.
+    """
+    if seen is None:
+        seen = set()
+    found: list[dict] = []
+    if isinstance(node, dict):
+        if "list_id" in node and "subject" in node:
+            key = str(node.get("list_id"))
+            if key not in seen:
+                seen.add(key)
+                found.append(node)
+        for value in node.values():
+            found.extend(_find_ads(value, seen))
+    elif isinstance(node, list):
+        for item in node:
+            found.extend(_find_ads(item, seen))
+    return found
 
 
 def _first_price(price) -> float | None:

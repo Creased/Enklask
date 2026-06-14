@@ -1,5 +1,11 @@
+import json
+
 from app.enums import Source
-from app.sources.leboncoin import LeboncoinSource
+from app.sources.leboncoin import (
+    LeboncoinSource,
+    _extract_ads_from_html,
+    _find_ads,
+)
 
 AD = {
     "list_id": 2890001,
@@ -39,3 +45,40 @@ def test_leboncoin_handles_missing_images():
     assert raw.thumbnail is None
     assert raw.photos == []
     assert raw.price is None
+
+
+def test_find_ads_recurses_and_dedups():
+    blob = {
+        "props": {
+            "pageProps": {
+                "searchData": {
+                    "ads": [AD, {"list_id": 2890002, "subject": "Switch Lite"}],
+                }
+            }
+        },
+        # A duplicate of the same ad nested elsewhere should be collapsed.
+        "other": [AD],
+    }
+    ads = _find_ads(blob)
+    ids = sorted(a["list_id"] for a in ads)
+    assert ids == [2890001, 2890002]
+
+
+def test_extract_ads_from_next_data_html():
+    next_data = {"props": {"pageProps": {"ads": [AD]}}}
+    html = (
+        '<html><body><script id="__NEXT_DATA__" type="application/json">'
+        + json.dumps(next_data)
+        + "</script></body></html>"
+    )
+    ads = _extract_ads_from_html(html)
+    assert len(ads) == 1
+    # The same _to_raw parser handles browser-sourced ads.
+    raw = LeboncoinSource()._to_raw(ads[0])
+    assert raw.source is Source.LEBONCOIN
+    assert raw.source_id == "2890001"
+    assert raw.price == 40.0
+
+
+def test_extract_ads_from_html_without_next_data():
+    assert _extract_ads_from_html("<html>no data here</html>") == []
