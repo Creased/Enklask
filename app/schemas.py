@@ -21,11 +21,35 @@ class ListingOut(BaseModel):
     location_city: str | None
     distance_km: float | None
     shipping_options: list
-    model_guess: str
-    part_guess: str
     status: str
     posted_at: datetime | None
     first_seen: datetime
+
+
+class TopicOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    slug: str
+    apprise_urls: str
+    position: int
+    created_at: datetime
+
+
+class SavedSearchOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    topic_id: int
+    name: str
+    query: str
+    price_max: float | None
+    max_distance_km: float | None
+    sources: list
+    tags: list
+    enabled: bool
+    created_at: datetime
 
 
 class PollResultOut(BaseModel):
