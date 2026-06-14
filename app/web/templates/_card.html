@@ -1,70 +1,117 @@
-{% set source_colors = {
-  "ebay": "bg-blue-100 text-blue-700",
-  "vinted": "bg-teal-100 text-teal-700",
-  "leboncoin": "bg-orange-100 text-orange-700",
-  "facebook": "bg-indigo-100 text-indigo-700",
-  "rakuten": "bg-red-100 text-red-700",
-  "geev": "bg-green-100 text-green-700"
+{% set source_styles = {
+  "ebay": "bg-blue-50 text-blue-600",
+  "vinted": "bg-teal-50 text-teal-600",
+  "leboncoin": "bg-orange-50 text-orange-600",
+  "facebook": "bg-indigo-50 text-indigo-600",
+  "rakuten": "bg-rose-50 text-rose-600",
+  "geev": "bg-emerald-50 text-emerald-600"
 } %}
 <div id="card-{{ listing.id }}"
-     class="bg-white rounded-lg shadow-sm overflow-hidden flex flex-col
-            {% if listing.status == 'liked' %}ring-2 ring-emerald-400{% endif %}">
-  <a href="{{ listing.url }}" target="_blank" rel="noopener" class="block bg-slate-200 aspect-[4/3] overflow-hidden">
+     class="listing-card relative bg-white rounded-2xl border border-warm-200 overflow-hidden flex flex-col
+            {% if listing.status == 'liked' %}ring-2 ring-brand{% endif %}">
+
+  <a href="{{ listing.url }}" target="_blank" rel="noopener"
+     class="block bg-warm-100 aspect-[4/3] overflow-hidden relative group">
     {% if listing.thumbnail %}
     <img src="{{ listing.thumbnail }}" alt="" loading="lazy"
-         class="w-full h-full object-cover hover:scale-105 transition-transform" />
+         class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
     {% else %}
-    <div class="w-full h-full flex items-center justify-center text-slate-400 text-4xl">🎮</div>
+    <div class="w-full h-full flex items-center justify-center">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="text-gray-300">
+        <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+      </svg>
+    </div>
     {% endif %}
+    <span class="source-pill absolute top-2.5 left-2.5 px-2 py-0.5 rounded-lg font-semibold backdrop-blur-sm
+                 {{ source_styles.get(listing.source, 'bg-gray-50 text-gray-600') }}">
+      {{ listing.source }}
+    </span>
   </a>
 
-  <div class="p-3 flex flex-col gap-2 flex-1">
-    <div class="flex items-center justify-between gap-2">
-      <span class="text-xs font-semibold px-2 py-0.5 rounded {{ source_colors.get(listing.source, 'bg-slate-100 text-slate-600') }}">
-        {{ listing.source }}
+  <button type="button" onclick="openPreview(this)" title="Aperçu"
+          class="preview-btn absolute top-2.5 right-2.5 z-10 w-8 h-8 flex items-center justify-center rounded-lg bg-white/90 backdrop-blur border border-warm-200 text-gray-500 hover:text-brand hover:border-brand/30 transition shadow-sm">
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2H2v4M10 2h4v4M6 14H2v-4M10 14h4v-4"/></svg>
+  </button>
+
+  <div class="p-3.5 flex flex-col gap-2 flex-1">
+    {% if listing.price is not none %}
+    {% set _hist = listing.price_history or [] %}
+    {% set _prev = _hist[-2].price if _hist|length >= 2 else none %}
+    {% set _dropped = _prev is not none and listing.price < _prev %}
+    {% set _rose = _prev is not none and listing.price > _prev %}
+    <div class="flex items-center gap-1.5">
+      <span class="text-lg font-bold text-gray-900">{{ "%.0f"|format(listing.price) }}&nbsp;{{ listing.currency }}</span>
+      {% if _dropped or _rose %}
+      <span class="shrink-0 {% if _dropped %}text-emerald-600{% else %}text-red-500{% endif %}"
+            title="Ancien prix&nbsp;: {{ '%.0f'|format(_prev) }}&nbsp;{{ listing.currency }}">
+        <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"
+             {% if _rose %}style="transform: scaleY(-1)"{% endif %} aria-hidden="true">
+          <title>{% if _dropped %}Baisse de prix{% else %}Hausse de prix{% endif %}</title>
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M2.29289 6.3006C2.68341 5.8998 3.31658 5.8998 3.7071 6.3006L8.53842 11.2591L11.5076 8.21177C11.8239 7.89353 12.2493 7.71532 12.6922 7.71532C13.1352 7.71532 13.5605 7.89357 13.8769 8.21181L13.884 8.21898L20 14.496V11.2895C20 10.7226 20.4477 10.2631 21 10.2631C21.5523 10.2631 22 10.7226 22 11.2895V16.9737C22 17.5405 21.5523 18 21 18H15.4616C14.9093 18 14.4616 17.5405 14.4616 16.9737C14.4616 16.4069 14.9093 15.9474 15.4616 15.9474H18.5858L12.6922 9.89881L9.72307 12.9461C9.40673 13.2644 8.98139 13.4426 8.53842 13.4426C8.09546 13.4426 7.67016 13.2643 7.35382 12.9461L7.34667 12.9389L2.29289 7.75204C1.90237 7.35123 1.90237 6.7014 2.29289 6.3006Z"></path>
+        </svg>
       </span>
-      {% if listing.price is not none %}
-      <span class="text-base font-bold text-slate-900">{{ "%.0f"|format(listing.price) }} {{ listing.currency }}</span>
       {% endif %}
     </div>
+    {% endif %}
 
     <a href="{{ listing.url }}" target="_blank" rel="noopener"
-       class="text-sm font-medium text-slate-800 line-clamp-2 hover:underline">
+       class="text-sm text-gray-700 line-clamp-2 hover:text-brand transition-colors leading-snug">
       {{ listing.title }}
     </a>
 
-    <div class="flex flex-wrap gap-1 text-[11px]">
-      {% if listing.model_guess and listing.model_guess != 'unknown' %}
-      <span class="px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">{{ listing.model_guess }}</span>
-      {% endif %}
-      {% if listing.part_guess and listing.part_guess != 'other' %}
-      <span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">{{ listing.part_guess }}</span>
-      {% endif %}
-      {% for ship in listing.shipping_options %}
-      <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{{ ship }}</span>
-      {% endfor %}
+    {% if listing.location_city or listing.distance_km is not none %}
+    <div class="text-xs text-gray-400 flex items-center gap-1">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" class="shrink-0"><path d="M8 1a5 5 0 015 5c0 3.53-5 9-5 9S3 9.53 3 6a5 5 0 015-5zm0 7a2 2 0 100-4 2 2 0 000 4z"/></svg>
+      {% if listing.location_city %}{{ listing.location_city }}{% endif %}
+      {% if listing.distance_km is not none %}<span class="text-gray-300">&middot;</span> {{ "%.0f"|format(listing.distance_km) }}&nbsp;km{% endif %}
     </div>
+    {% endif %}
 
-    <div class="text-xs text-slate-500 mt-auto">
-      {% if listing.location_city %}📍 {{ listing.location_city }}{% endif %}
-      {% if listing.distance_km is not none %} · {{ "%.0f"|format(listing.distance_km) }} km{% endif %}
+    {% set posted = listing.posted_at or listing.first_seen %}
+    {% if posted %}
+    <div class="text-xs text-gray-400 flex items-center gap-1"
+         {% if not listing.posted_at %}title="Date de première détection — date de publication indisponible pour cette annonce"{% endif %}>
+      <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor" class="shrink-0"><path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zm.6 2.6a.6.6 0 00-1.2 0V8c0 .2.1.4.3.5l2.8 1.7a.6.6 0 10.62-1.04L8.6 7.66V4.1z"/></svg>
+      {% if not listing.posted_at %}vu {% endif %}{{ posted | timeago }}
     </div>
+    {% endif %}
 
-    <div class="flex gap-2 pt-1">
+    <div class="flex gap-1.5 pt-1.5 mt-auto">
       <a href="{{ listing.url }}" target="_blank" rel="noopener"
-         class="flex-1 text-center text-xs font-medium bg-slate-900 text-white rounded px-2 py-1.5 hover:bg-slate-700">
-        Voir l'annonce ↗
+         class="flex-1 text-center text-xs font-semibold bg-brand text-white rounded-xl px-3 py-2 hover:bg-brand-dark transition-colors">
+        Voir
       </a>
       <button title="J'aime"
-              class="text-sm px-2 py-1.5 rounded border hover:bg-emerald-50"
+              class="action-btn text-sm w-9 h-9 flex items-center justify-center rounded-xl border border-warm-200 hover:bg-brand-light hover:border-brand/30
+                     {% if listing.status == 'liked' %}bg-brand-light border-brand/30{% endif %}"
               hx-post="/partials/listings/{{ listing.id }}/status"
               hx-vals='{"value": "liked"}'
-              hx-target="#card-{{ listing.id }}" hx-swap="outerHTML">❤️</button>
+              hx-target="#card-{{ listing.id }}" hx-swap="outerHTML">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="{% if listing.status == 'liked' %}#E63946{% else %}none{% endif %}" stroke="#E63946" stroke-width="1.5">
+          <path d="M8 13.7l-1.1-1C3.6 9.8 1.5 7.9 1.5 5.6 1.5 3.7 3 2.2 4.9 2.2c1 0 2 .5 2.6 1.3.7-.8 1.6-1.3 2.6-1.3 1.9 0 3.4 1.5 3.4 3.4 0 2.3-2.1 4.2-5.4 7.1L8 13.7z"/>
+        </svg>
+      </button>
       <button title="Masquer"
-              class="text-sm px-2 py-1.5 rounded border hover:bg-red-50"
+              class="action-btn text-sm w-9 h-9 flex items-center justify-center rounded-xl border border-warm-200 hover:bg-gray-100"
               hx-post="/partials/listings/{{ listing.id }}/status"
               hx-vals='{"value": "hidden"}'
-              hx-target="#card-{{ listing.id }}" hx-swap="outerHTML">🚫</button>
+              hx-target="#card-{{ listing.id }}" hx-swap="outerHTML">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#9CA3AF" stroke-width="1.5" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
+      </button>
     </div>
   </div>
+
+  <script type="application/json" class="preview-data">{{ {
+    "title": listing.title,
+    "price": (("%.0f"|format(listing.price)) ~ " " ~ listing.currency) if listing.price is not none else "",
+    "currency": listing.currency,
+    "priceHistory": listing.price_history or [],
+    "source": listing.source,
+    "id": listing.source_id,
+    "location": (listing.location_city or "") ~ ((" · " ~ ("%.0f"|format(listing.distance_km)) ~ " km") if listing.distance_km is not none else ""),
+    "posted": (listing.posted_at | timeago) if listing.posted_at else (("vu " ~ (listing.first_seen | timeago)) if listing.first_seen else ""),
+    "description": listing.description or "",
+    "url": listing.url,
+    "photos": listing.photos or ([listing.thumbnail] if listing.thumbnail else [])
+  } | tojson }}</script>
 </div>

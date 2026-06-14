@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Search hero -->
+<div class="max-w-4xl mx-auto mb-8">
+  <h1 class="text-2xl font-bold text-gray-900 text-center mb-1">Recherche instantanée</h1>
+  <p class="text-sm text-gray-400 text-center mb-5">Les filtres sont appliqués directement à la source</p>
+
+  <form class="bg-white rounded-2xl border border-warm-200 p-4 space-y-3"
+        hx-get="/search/results"
+        hx-target="#search-results"
+        hx-swap="innerHTML"
+        hx-trigger="submit, change, load"
+        hx-indicator="#search-spinner">
+
+    <!-- Query row -->
+    <div class="flex gap-2">
+      <div class="relative flex-1">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398h-.001l3.85 3.85a1 1 0 001.415-1.414l-3.85-3.85-.017.016zm-5.242.156a5 5 0 110-10 5 5 0 010 10z"/>
+        </svg>
+        <input type="text" name="q" id="live-q" value="{{ q }}" autofocus
+               placeholder="Que cherches-tu ?"
+               class="w-full bg-warm-50 border border-warm-200 rounded-xl pl-9 pr-4 py-2.5 text-sm text-gray-700 placeholder-gray-400
+                      focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/30 transition" />
+      </div>
+      <button type="submit"
+              class="bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors shrink-0">
+        <span id="search-spinner" class="htmx-indicator mr-1">
+          <svg class="inline w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round"/></svg>
+        </span>
+        Rechercher
+      </button>
+    </div>
+
+    <!-- Crawl filters: pushed into each source's native query -->
+    <div class="flex flex-wrap gap-2 items-center">
+      <select name="sort" class="filter-select text-sm bg-warm-50 border-0 rounded-xl px-3 py-2 text-gray-700 font-medium focus:ring-2 focus:ring-brand/20 focus:outline-none">
+        <option value="relevance">Pertinence</option>
+        <option value="recent" selected>Plus récentes</option>
+        <option value="oldest">Plus anciennes</option>
+        <option value="price_asc">Prix croissants</option>
+        <option value="price_desc">Prix décroissants</option>
+      </select>
+      <select name="condition" class="filter-select text-sm bg-warm-50 border-0 rounded-xl px-3 py-2 text-gray-700 font-medium focus:ring-2 focus:ring-brand/20 focus:outline-none">
+        <option value="">État (tous)</option>
+        {% for key, label in condition_labels.items() %}
+        <option value="{{ key }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+      <input type="number" name="price_min" min="0" step="1" placeholder="Prix min €"
+             class="text-sm bg-warm-50 border-0 rounded-xl px-3 py-2 w-24 text-gray-700 font-medium placeholder-gray-400 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+      <input type="number" name="price_max" min="0" step="1" placeholder="Prix max €"
+             class="text-sm bg-warm-50 border-0 rounded-xl px-3 py-2 w-24 text-gray-700 font-medium placeholder-gray-400 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+      <select name="source" class="filter-select text-sm bg-warm-50 border-0 rounded-xl px-3 py-2 text-gray-700 font-medium focus:ring-2 focus:ring-brand/20 focus:outline-none ml-auto">
+        <option value="">Toutes sources</option>
+        {% for src in enabled_sources %}
+        <option value="{{ src }}">{{ src | capitalize }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </form>
+</div>
+
+<!-- Results -->
+<div id="search-results">
+  {% if q %}
+  <div class="text-center py-12 text-gray-400 text-sm">
+    Recherche en cours…
+  </div>
+  {% endif %}
+</div>
+
+<!-- Save search modal -->
+<div id="save-search-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="this.parentElement.classList.add('hidden')"></div>
+  <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+    <div class="px-6 py-5 border-b border-warm-200">
+      <h2 class="text-lg font-semibold text-gray-900">Sauvegarder la recherche</h2>
+    </div>
+    <form method="post" action="/search/save" class="p-6 space-y-4">
+      <input type="hidden" name="query" id="save-query" />
+
+      <label class="flex flex-col gap-1.5">
+        <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Nom</span>
+        <input type="text" name="name" id="save-name" placeholder="Nom de la recherche"
+               class="bg-warm-50 border border-warm-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 focus:ring-2 focus:ring-brand/20 focus:border-brand/30 focus:outline-none" />
+      </label>
+
+      <label class="flex flex-col gap-1.5">
+        <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Topic</span>
+        <select name="topic_id" id="save-topic-select"
+                onchange="document.getElementById('new-topic-fields').classList.toggle('hidden', this.value !== 'new')"
+                class="bg-warm-50 border border-warm-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 focus:ring-2 focus:ring-brand/20 focus:border-brand/30 focus:outline-none">
+          {% for t in topics %}
+          <option value="{{ t.id }}">{{ t.name }}</option>
+          {% endfor %}
+          <option value="new">+ Nouveau topic</option>
+        </select>
+      </label>
+
+      <div id="new-topic-fields" class="hidden space-y-3 pl-3 border-l-2 border-brand/20">
+        <label class="flex flex-col gap-1.5">
+          <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Nom du topic</span>
+          <input type="text" name="new_topic_name" placeholder="ex: Laptop"
+                 class="bg-warm-50 border border-warm-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 focus:ring-2 focus:ring-brand/20 focus:border-brand/30 focus:outline-none" />
+        </label>
+      </div>
+
+      <label class="flex flex-col gap-1.5">
+        <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">État</span>
+        <select name="condition" id="save-condition"
+                class="bg-warm-50 border border-warm-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 focus:ring-2 focus:ring-brand/20 focus:border-brand/30 focus:outline-none">
+          <option value="">Tous les états</option>
+          {% for key, label in condition_labels.items() %}
+          <option value="{{ key }}">{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+
+      <label class="flex flex-col gap-1.5">
+        <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Tags (séparés par des virgules)</span>
+        <input type="text" name="tags" placeholder="ex: OLED, écran, pièces"
+               class="bg-warm-50 border border-warm-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 focus:ring-2 focus:ring-brand/20 focus:border-brand/30 focus:outline-none" />
+      </label>
+
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="this.closest('#save-search-modal').classList.add('hidden')"
+                class="flex-1 py-2.5 rounded-xl border border-warm-200 text-sm font-medium text-gray-600 hover:bg-warm-50 transition-colors">
+          Annuler
+        </button>
+        <button type="submit"
+                class="flex-1 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold transition-colors">
+          Sauvegarder
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openSaveModal() {
+  var q = (document.getElementById('live-q') || {}).value || '';
+  document.getElementById('save-query').value = q;
+  document.getElementById('save-name').value = q;
+  // Carry the live filter's condition into the modal so it's saved with the search.
+  var liveCond = document.querySelector('form[hx-get="/search/results"] select[name="condition"]');
+  var saveCond = document.getElementById('save-condition');
+  if (liveCond && saveCond) saveCond.value = liveCond.value;
+  // Reveal the new-topic fields if "Nouveau topic" is already selected
+  // (the default when no topics exist yet) — onchange won't have fired.
+  var sel = document.getElementById('save-topic-select');
+  document.getElementById('new-topic-fields').classList.toggle('hidden', sel.value !== 'new');
+  document.getElementById('save-search-modal').classList.remove('hidden');
+}
+</script>
+
+{% endblock %}

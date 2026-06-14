@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Source badges -->
+{% if enabled_sources %}
+<div class="flex items-center gap-2 flex-wrap mb-6">
+  {% for src in enabled_sources %}
+  <span class="source-pill px-2.5 py-1 rounded-full bg-brand-light text-brand font-medium">{{ src }}</span>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Topic cards -->
+{% if topic_stats %}
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+  {% for ts in topic_stats %}
+  {% include "_topic_card.html" %}
+  {% endfor %}
+
+  <!-- Create topic card -->
+  <button onclick="document.getElementById('new-topic-modal').classList.remove('hidden')"
+          class="bg-white rounded-2xl border-2 border-dashed border-warm-200 hover:border-brand/40 hover:bg-brand-light/30
+                 flex flex-col items-center justify-center gap-3 py-12 transition-all duration-200 cursor-pointer group min-h-[200px]">
+    <div class="w-12 h-12 rounded-full bg-warm-100 group-hover:bg-brand-light flex items-center justify-center transition-colors">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-gray-400 group-hover:text-brand transition-colors">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+    </div>
+    <span class="text-sm font-medium text-gray-400 group-hover:text-brand transition-colors">Nouveau topic</span>
+  </button>
+
+</div>
+
+{% else %}
+
+<!-- Empty state -->
+<div class="text-center py-20">
+  <div class="w-20 h-20 rounded-full bg-warm-100 flex items-center justify-center mx-auto mb-6">
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-gray-300">
+      <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+    </svg>
+  </div>
+  <h2 class="text-xl font-semibold text-gray-900 mb-2">Bienvenue sur Enklask</h2>
+  <p class="text-gray-400 mb-6 max-w-md mx-auto">
+    Centralise tes annonces de plusieurs marketplaces. Crée ton premier topic pour commencer.
+  </p>
+  <button onclick="document.getElementById('new-topic-modal').classList.remove('hidden')"
+          class="bg-brand hover:bg-brand-dark text-white font-semibold px-6 py-3 rounded-xl transition-colors text-sm">
+    Créer un topic
+  </button>
+</div>
+{% endif %}
+
+<!-- New topic modal -->
+<div id="new-topic-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" onclick="this.parentElement.classList.add('hidden')"></div>
+  <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+    <div class="px-6 py-5 border-b border-warm-200">
+      <h2 class="text-lg font-semibold text-gray-900">Nouveau topic</h2>
+    </div>
+    <form method="post" action="/topics" class="p-6 space-y-4">
+      <label class="flex flex-col gap-1.5">
+        <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Nom</span>
+        <input type="text" name="name" required placeholder="ex: Nintendo Switch, Laptop, Vélo..."
+               class="bg-warm-50 border border-warm-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 focus:ring-2 focus:ring-brand/20 focus:border-brand/30 focus:outline-none" />
+      </label>
+      <label class="flex flex-col gap-1.5">
+        <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Apprise URL (optionnel)</span>
+        <input type="text" name="apprise_urls" placeholder="http://..."
+               class="bg-warm-50 border border-warm-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 focus:ring-2 focus:ring-brand/20 focus:border-brand/30 focus:outline-none" />
+      </label>
+      <div class="flex gap-3 pt-2">
+        <button type="button" onclick="this.closest('#new-topic-modal').classList.add('hidden')"
+                class="flex-1 py-2.5 rounded-xl border border-warm-200 text-sm font-medium text-gray-600 hover:bg-warm-50 transition-colors">
+          Annuler
+        </button>
+        <button type="submit"
+                class="flex-1 py-2.5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold transition-colors">
+          Créer
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

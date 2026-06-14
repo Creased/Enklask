@@ -3,32 +3,257 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Switch Parts Tracker</title>
+  <title>Enklask</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-  <link rel="stylesheet" href="/static/app.css" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand:  { DEFAULT: '#E63946', light: '#FDE8EA', dark: '#C62828' },
+            warm:   { 50: '#FAF9F7', 100: '#F3F1ED', 200: '#E5E5E5' },
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          borderRadius: {
+            '2xl': '1rem',
+            '3xl': '1.25rem',
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+  <link rel="stylesheet" href="/static/app.css?v={{ css_v }}" />
 </head>
-<body class="bg-slate-100 text-slate-800">
-  <header class="bg-slate-900 text-white">
-    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-      <h1 class="text-xl font-semibold flex items-center gap-2">
-        <span>🎮</span> Switch Parts Tracker
-      </h1>
-      <button
-        class="bg-emerald-500 hover:bg-emerald-400 text-white text-sm font-medium px-4 py-2 rounded"
-        hx-post="/refresh"
-        hx-target="#grid"
-        hx-swap="innerHTML"
-        hx-indicator="#refresh-spinner"
-      >
-        <span id="refresh-spinner" class="htmx-indicator">⏳</span>
-        Rafraîchir
-      </button>
+<body class="bg-warm-50 text-gray-800 min-h-screen">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-warm-200 sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 h-14 flex items-center gap-4">
+
+      <a href="/" class="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0">
+        <svg width="26" height="26" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="16" cy="16" r="14" fill="#E63946"/>
+          <circle cx="16" cy="11" r="4.2" stroke="white" stroke-width="2" fill="none"/>
+          <path d="M18.8 14 C21 17, 16 19, 16 22" stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
+          <circle cx="16" cy="25.5" r="1.8" fill="white"/>
+        </svg>
+        <span class="text-lg font-bold text-gray-900 tracking-tight">Enklask</span>
+      </a>
+
+      <!-- Search bar -->
+      <form action="/search" method="get" class="flex-1 max-w-md">
+        <div class="relative">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M11.742 10.344a6.5 6.5 0 10-1.397 1.398h-.001l3.85 3.85a1 1 0 001.415-1.414l-3.85-3.85-.017.016zm-5.242.156a5 5 0 110-10 5 5 0 010 10z"/>
+          </svg>
+          <input type="text" name="q" value="{{ q|default('', true) }}"
+                 placeholder="Rechercher sur toutes les sources..."
+                 class="w-full bg-warm-50 border border-warm-200 rounded-xl pl-9 pr-4 py-2 text-sm text-gray-700 placeholder-gray-400
+                        focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/30 transition" />
+        </div>
+      </form>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <a href="/settings"
+           class="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-warm-100 transition">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+          </svg>
+        </a>
+      </div>
     </div>
   </header>
 
-  <main class="max-w-7xl mx-auto px-4 py-6">
+  <main class="max-w-6xl mx-auto px-4 py-6">
     {% block content %}{% endblock %}
   </main>
+
+  <!-- Listing preview modal (shared across pages) -->
+  <div id="preview-modal" class="hidden fixed inset-0 z-[110] flex items-center justify-center p-4">
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closePreview()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col md:flex-row">
+
+      <!-- Carousel -->
+      <div class="relative md:w-3/5 bg-warm-100 flex items-center justify-center shrink-0 min-h-[200px]">
+        <img id="pv-img" src="" alt="" class="w-full object-contain max-h-[45vh] md:max-h-[90vh]" />
+        <div id="pv-noimg" class="hidden text-gray-300">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+        </div>
+        <button id="pv-prev" type="button" onclick="previewNav(-1)"
+                class="hidden absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full bg-white/90 shadow hover:bg-white text-gray-700">
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L5 8l5 5"/></svg>
+        </button>
+        <button id="pv-next" type="button" onclick="previewNav(1)"
+                class="hidden absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full bg-white/90 shadow hover:bg-white text-gray-700">
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3l5 5-5 5"/></svg>
+        </button>
+        <span id="pv-counter" class="absolute bottom-2 right-2 text-[11px] font-medium bg-black/60 text-white px-2 py-0.5 rounded-full"></span>
+      </div>
+
+      <!-- Details -->
+      <div class="md:w-2/5 p-5 flex flex-col gap-2.5 overflow-y-auto">
+        <span id="pv-source" class="self-start px-2 py-0.5 rounded-lg text-xs font-semibold"></span>
+        <span id="pv-price" class="text-2xl font-bold text-gray-900"></span>
+        <div id="pv-history" class="hidden text-xs text-gray-400 items-center gap-1 flex-wrap"></div>
+        <h2 id="pv-title" class="text-sm text-gray-700 leading-snug"></h2>
+        <div id="pv-location" class="text-xs text-gray-400"></div>
+        <div id="pv-posted" class="text-xs text-gray-400"></div>
+        <p id="pv-desc" class="text-xs text-gray-500 whitespace-pre-line leading-relaxed mt-1"></p>
+        <a id="pv-link" href="#" target="_blank" rel="noopener"
+           class="mt-auto text-center text-sm font-semibold bg-brand text-white rounded-xl px-3 py-2.5 hover:bg-brand-dark transition-colors">
+          Voir l'annonce
+        </a>
+      </div>
+
+      <button type="button" onclick="closePreview()" title="Fermer"
+              class="absolute top-2 right-2 w-8 h-8 flex items-center justify-center rounded-lg bg-white/90 backdrop-blur text-gray-500 hover:text-gray-800 shadow-sm">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <script>
+    var PV_SRC_STYLES = {
+      ebay: 'bg-blue-50 text-blue-600', vinted: 'bg-teal-50 text-teal-600',
+      leboncoin: 'bg-orange-50 text-orange-600', facebook: 'bg-indigo-50 text-indigo-600',
+      rakuten: 'bg-rose-50 text-rose-600', geev: 'bg-emerald-50 text-emerald-600'
+    };
+    var _pv = { photos: [], idx: 0 };
+    var _pvToken = 0;
+
+    function openPreview(btn) {
+      var card = btn.closest('.listing-card');
+      var holder = card && card.querySelector('.preview-data');
+      if (!holder) return;
+      var d;
+      try { d = JSON.parse(holder.textContent); } catch (e) { return; }
+      _pv = { photos: d.photos || [], idx: 0 };
+
+      var src = document.getElementById('pv-source');
+      src.textContent = d.source || '';
+      src.className = 'self-start px-2 py-0.5 rounded-lg text-xs font-semibold ' +
+        (PV_SRC_STYLES[d.source] || 'bg-gray-100 text-gray-600');
+
+      var price = document.getElementById('pv-price');
+      price.textContent = d.price || '';
+      price.classList.toggle('hidden', !d.price);
+
+      // Price trail: 60 € → 55 € → 50 € (last point emphasised).
+      var hist = d.priceHistory || [];
+      var histEl = document.getElementById('pv-history');
+      histEl.innerHTML = '';
+      if (hist.length >= 2) {
+        var cur = d.currency || '';
+        hist.forEach(function (e, i) {
+          if (i) {
+            var arrow = document.createElement('span');
+            arrow.className = 'text-gray-300';
+            arrow.textContent = '→';
+            histEl.appendChild(arrow);
+          }
+          var span = document.createElement('span');
+          if (i === hist.length - 1) span.className = 'font-semibold text-gray-600';
+          span.textContent = Math.round(e.price) + (cur ? ' ' + cur : '');
+          histEl.appendChild(span);
+        });
+        histEl.classList.remove('hidden');
+        histEl.classList.add('flex');
+      } else {
+        histEl.classList.add('hidden');
+        histEl.classList.remove('flex');
+      }
+
+      document.getElementById('pv-title').textContent = d.title || '';
+      _pvField('pv-location', d.location);
+      _pvField('pv-posted', d.posted);
+      document.getElementById('pv-link').href = d.url || '#';
+
+      // Show whatever description the card carries; enrich below.
+      var descEl = document.getElementById('pv-desc');
+      if (d.description) {
+        descEl.textContent = d.description;
+        descEl.classList.remove('hidden', 'italic', 'text-gray-300');
+      } else {
+        descEl.textContent = 'Chargement de la description…';
+        descEl.classList.remove('hidden');
+        descEl.classList.add('italic', 'text-gray-300');
+      }
+
+      renderPreviewSlide();
+      document.getElementById('preview-modal').classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+
+      // Lazily fetch the full description + photo gallery (cached server-side).
+      var token = ++_pvToken;
+      if (d.source && d.id) {
+        fetch('/api/preview?source=' + encodeURIComponent(d.source) + '&id=' + encodeURIComponent(d.id))
+          .then(function (r) { return r.json(); })
+          .then(function (x) {
+            if (token !== _pvToken) return;  // a newer preview was opened
+            if (x.description) {
+              descEl.textContent = x.description;
+              descEl.classList.remove('italic', 'text-gray-300');
+            } else if (!d.description) {
+              descEl.classList.add('hidden');
+            }
+            if (x.photos && x.photos.length) {
+              _pv.photos = x.photos; _pv.idx = 0; renderPreviewSlide();
+            }
+          })
+          .catch(function () {
+            if (token === _pvToken && !d.description) descEl.classList.add('hidden');
+          });
+      } else if (!d.description) {
+        descEl.classList.add('hidden');
+      }
+    }
+
+    function _pvField(id, value) {
+      var el = document.getElementById(id);
+      el.textContent = value || '';
+      el.classList.toggle('hidden', !value);
+    }
+
+    function renderPreviewSlide() {
+      var img = document.getElementById('pv-img');
+      var noimg = document.getElementById('pv-noimg');
+      if (_pv.photos.length) {
+        img.src = _pv.photos[_pv.idx];
+        img.classList.remove('hidden');
+        noimg.classList.add('hidden');
+      } else {
+        img.classList.add('hidden');
+        noimg.classList.remove('hidden');
+      }
+      var multi = _pv.photos.length > 1;
+      document.getElementById('pv-prev').classList.toggle('hidden', !multi);
+      document.getElementById('pv-next').classList.toggle('hidden', !multi);
+      document.getElementById('pv-counter').textContent =
+        multi ? (_pv.idx + 1) + ' / ' + _pv.photos.length : '';
+    }
+
+    function previewNav(delta) {
+      if (!_pv.photos.length) return;
+      _pv.idx = (_pv.idx + delta + _pv.photos.length) % _pv.photos.length;
+      renderPreviewSlide();
+    }
+
+    function closePreview() {
+      document.getElementById('preview-modal').classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (document.getElementById('preview-modal').classList.contains('hidden')) return;
+      if (e.key === 'Escape') closePreview();
+      else if (e.key === 'ArrowLeft') previewNav(-1);
+      else if (e.key === 'ArrowRight') previewNav(1);
+    });
+  </script>
+
 </body>
 </html>

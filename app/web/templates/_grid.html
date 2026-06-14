@@ -1,11 +1,15 @@
 {% if listings %}
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-  {% for listing in listings %}
-    {% include "_card.html" %}
-  {% endfor %}
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+  {% include "_grid_items.html" %}
 </div>
 {% else %}
-<div class="text-center text-slate-500 py-16">
-  Aucune annonce pour ces filtres. Lance un « Rafraîchir » ou élargis la recherche.
+<div class="text-center py-20">
+  <div class="w-16 h-16 rounded-full bg-warm-100 flex items-center justify-center mx-auto mb-4">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-gray-300">
+      <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+    </svg>
+  </div>
+  <p class="text-gray-400 text-sm mb-1">Aucune annonce trouvée</p>
+  <p class="text-gray-300 text-xs">Essaie d'actualiser ou d'élargir tes filtres</p>
 </div>
 {% endif %}

@@ -1,0 +1,52 @@
+<div id="search-row-{{ search.id }}" class="px-5 py-4 flex items-center gap-3">
+  <div class="flex-1 min-w-0">
+    <p class="text-sm font-medium text-gray-900 truncate">{{ search.name }}</p>
+    <p class="text-xs text-gray-400 truncate">{{ search.query }}</p>
+    {% if search.tags %}
+    <div class="flex gap-1 mt-1.5 flex-wrap">
+      {% for tag in search.tags %}
+      <span class="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-warm-100 text-gray-500">{{ tag }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if search.price_max %}
+    <span class="text-[10px] text-gray-400 mt-1 inline-block">Max: {{ "%.0f"|format(search.price_max) }} €</span>
+    {% endif %}
+    {% if search.condition %}
+    <span class="text-[10px] text-gray-400 mt-1 inline-block">· État : {{ (condition_labels or {}).get(search.condition, search.condition) }}</span>
+    {% endif %}
+  </div>
+
+  <span class="text-xs font-semibold text-gray-500 shrink-0 whitespace-nowrap">
+    {{ count }} annonce{{ 's' if count != 1 else '' }}
+  </span>
+
+  <button hx-post="/t/{{ topic.slug }}/searches/{{ search.id }}/refresh"
+          hx-target="#search-row-{{ search.id }}"
+          hx-swap="outerHTML"
+          title="Actualiser cette recherche"
+          class="shrink-0 p-1.5 rounded-lg text-gray-400 hover:text-brand hover:bg-brand-light transition">
+    <svg class="htmx-hide-on-request w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M13.6 8a5.6 5.6 0 11-1.7-4M13.6 2.2v3.2h-3.2"/>
+    </svg>
+    <svg class="htmx-indicator w-4 h-4 animate-spin text-brand" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" stroke-dasharray="42 16" stroke-linecap="round"/>
+    </svg>
+  </button>
+
+  <form method="post" action="/t/{{ topic.slug }}/searches/{{ search.id }}/toggle" class="shrink-0">
+    <button type="submit" title="{% if search.enabled %}Désactiver{% else %}Activer{% endif %}">
+      <input type="checkbox" {% if search.enabled %}checked{% endif %} class="sr-only peer" tabindex="-1" />
+      <div class="toggle-track {% if search.enabled %}bg-brand{% endif %}"></div>
+    </button>
+  </form>
+
+  <form method="post" action="/t/{{ topic.slug }}/searches/{{ search.id }}/delete" class="shrink-0"
+        onsubmit="return confirm('Supprimer cette recherche ?')">
+    <button type="submit" class="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+        <line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/>
+      </svg>
+    </button>
+  </form>
+</div>

@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="max-w-2xl mx-auto">
+
+  <div class="flex items-center gap-3 mb-6">
+    <a href="/" class="p-2 -ml-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-warm-100 transition">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
+    </a>
+    <h1 class="text-xl font-bold text-gray-900">Paramètres</h1>
+  </div>
+
+  {% if saved %}
+  <div class="mb-5 px-4 py-3 rounded-2xl bg-emerald-50 text-emerald-700 text-sm font-medium flex items-center gap-2">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 110 14A7 7 0 018 1zm3.2 4.8a.6.6 0 00-.85-.85L7 8.3 5.65 6.95a.6.6 0 10-.85.85l1.8 1.8a.6.6 0 00.85 0l3.75-3.8z"/></svg>
+    Configuration enregistrée
+  </div>
+  {% endif %}
+
+  <form method="post" action="/settings" class="space-y-4">
+
+    <!-- General -->
+    <section class="bg-white rounded-2xl border border-warm-200 overflow-hidden">
+      <div class="px-5 py-4 border-b border-warm-200">
+        <h2 class="font-semibold text-gray-900">Général</h2>
+      </div>
+      <div class="p-5 space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <label class="flex flex-col gap-1.5">
+            <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Intervalle (min)</span>
+            <input type="number" name="poll_interval_minutes" min="1" step="1"
+                   value="{{ settings.poll_interval_minutes }}"
+                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+          </label>
+          <label class="flex flex-col gap-1.5">
+            <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Latitude</span>
+            <input type="text" name="home_lat" id="home_lat" value="{{ settings.home_lat }}"
+                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+          </label>
+          <label class="flex flex-col gap-1.5">
+            <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Longitude</span>
+            <input type="text" name="home_lon" id="home_lon" value="{{ settings.home_lon }}"
+                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+          </label>
+        </div>
+        <button type="button" id="geolocate-btn" onclick="geolocate()"
+                class="text-sm text-brand font-medium hover:underline">
+          Me localiser
+        </button>
+
+        <div class="pt-3 border-t border-warm-200">
+          <label class="flex flex-col gap-1.5">
+            <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Fichier cookies.txt</span>
+            <input type="text" name="cookies_file" value="{{ settings.cookies_file }}"
+                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+          </label>
+          <p class="mt-1.5 text-xs text-gray-400 leading-relaxed">
+            Contourne les protections anti-bot (eBay, Rakuten…).
+            Exportez vos cookies avec
+            <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" class="text-brand hover:underline">Get cookies.txt LOCALLY</a>
+            et placez le fichier dans <code class="bg-warm-100 px-1 rounded text-[11px]">data/</code>.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sources -->
+    <section class="bg-white rounded-2xl border border-warm-200 overflow-hidden">
+      <div class="px-5 py-4 border-b border-warm-200">
+        <h2 class="font-semibold text-gray-900">Sources</h2>
+      </div>
+      <div class="divide-y divide-warm-200">
+
+        {% macro source_toggle(name, label, color, hint, fields=None) %}
+        <div class="px-5 py-4">
+          <label class="flex items-center justify-between cursor-pointer">
+            <div class="flex items-center gap-2.5">
+              <span class="text-sm font-semibold {{ color }}">{{ label }}</span>
+              <span class="text-xs text-gray-400">{{ hint }}</span>
+            </div>
+            <input type="checkbox" name="enable_{{ name }}" {% if settings['enable_' + name] %}checked{% endif %} class="sr-only peer" />
+            <div class="toggle-track peer"></div>
+          </label>
+          {% if fields %}
+          <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {{ fields }}
+          </div>
+          {% endif %}
+        </div>
+        {% endmacro %}
+
+        {{ source_toggle("vinted", "Vinted", "text-teal-600", "aucune clé requise") }}
+        {{ source_toggle("leboncoin", "Leboncoin", "text-orange-600", "best effort (DataDome)") }}
+        {{ source_toggle("rakuten", "Rakuten", "text-rose-600", "aucune clé requise") }}
+
+        <!-- Geev -->
+        <div class="px-5 py-4">
+          <label class="flex items-center justify-between cursor-pointer">
+            <div class="flex items-center gap-2.5">
+              <span class="text-sm font-semibold text-emerald-600">Geev</span>
+              <span class="text-xs text-gray-400">clé optionnelle</span>
+            </div>
+            <input type="checkbox" name="enable_geev" {% if settings.enable_geev %}checked{% endif %} class="sr-only peer" />
+            <div class="toggle-track peer"></div>
+          </label>
+          <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <input type="text" name="geev_base_url" value="{{ settings.geev_base_url }}" placeholder="URL API"
+                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-xs text-gray-600 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+            <input type="password" name="geev_api_key" value="{{ settings.geev_api_key }}" placeholder="Clé API (optionnel)"
+                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-xs text-gray-600 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+            <input type="number" name="geev_radius_km" min="1" value="{{ settings.geev_radius_km }}" placeholder="Rayon km"
+                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-xs text-gray-600 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+          </div>
+          <input type="hidden" name="geev_web_base" value="{{ settings.geev_web_base }}" />
+        </div>
+
+        <!-- eBay -->
+        <div class="px-5 py-4">
+          <label class="flex items-center justify-between cursor-pointer">
+            <div class="flex items-center gap-2.5">
+              <span class="text-sm font-semibold text-blue-600">eBay</span>
+              <span class="text-xs text-gray-400">cookies ou clés API</span>
+            </div>
+            <input type="checkbox" name="enable_ebay" {% if settings.enable_ebay %}checked{% endif %} class="sr-only peer" />
+            <div class="toggle-track peer"></div>
+          </label>
+          <p class="mt-1.5 text-xs text-gray-400">
+            Fonctionne sans clé via cookies.txt, ou avec un compte gratuit sur
+            <a href="https://developer.ebay.com/" target="_blank" class="text-brand hover:underline">developer.ebay.com</a>.
+          </p>
+          <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <input type="text" name="ebay_client_id" value="{{ settings.ebay_client_id }}" placeholder="Client ID (optionnel)"
+                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-xs text-gray-600 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+            <input type="password" name="ebay_client_secret" value="{{ settings.ebay_client_secret }}" placeholder="Client Secret (optionnel)"
+                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-xs text-gray-600 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+            <input type="text" name="ebay_marketplace_id" value="{{ settings.ebay_marketplace_id }}" placeholder="Marketplace"
+                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-xs text-gray-600 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+          </div>
+        </div>
+
+        <!-- Facebook -->
+        <div class="px-5 py-4">
+          <label class="flex items-center justify-between cursor-pointer">
+            <div class="flex items-center gap-2.5">
+              <span class="text-sm font-semibold text-indigo-600">Facebook</span>
+              <span class="text-xs text-gray-400">expérimental</span>
+            </div>
+            <input type="checkbox" name="enable_facebook" {% if settings.enable_facebook %}checked{% endif %} class="sr-only peer" />
+            <div class="toggle-track peer"></div>
+          </label>
+          <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <input type="text" name="facebook_storage_state" value="{{ settings.facebook_storage_state }}" placeholder="Fichier storage-state"
+                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-xs text-gray-600 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+            <input type="text" name="facebook_city" value="{{ settings.facebook_city }}" placeholder="Ville"
+                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-xs text-gray-600 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+          </div>
+        </div>
+
+        <input type="hidden" name="vinted_base_url" value="{{ settings.vinted_base_url }}" />
+        <input type="hidden" name="leboncoin_base_url" value="{{ settings.leboncoin_base_url }}" />
+        <input type="hidden" name="rakuten_base_url" value="{{ settings.rakuten_base_url }}" />
+      </div>
+    </section>
+
+    <!-- Notifications -->
+    <section class="bg-white rounded-2xl border border-warm-200 overflow-hidden">
+      <div class="px-5 py-4 border-b border-warm-200">
+        <h2 class="font-semibold text-gray-900">Notifications (par défaut)</h2>
+      </div>
+      <div class="p-5 space-y-4">
+        <label class="flex flex-col gap-1.5">
+          <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">URL Apprise</span>
+          <input type="text" name="apprise_urls" value="{{ settings.apprise_urls }}"
+                 placeholder="http://apprise:8001/notify/switch"
+                 class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+        </label>
+        <p class="text-xs text-gray-400">
+          URL utilisée par défaut. Chaque topic peut définir sa propre URL dans ses paramètres.
+        </p>
+
+        <div class="flex flex-col sm:flex-row sm:items-center gap-4">
+          <label class="flex items-center gap-2.5 cursor-pointer">
+            <input type="checkbox" name="notify_on_first_run"
+                   {% if settings.notify_on_first_run %}checked{% endif %} class="sr-only peer" />
+            <div class="toggle-track peer"></div>
+            <span class="text-sm text-gray-600">Notifier au 1er poll</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <span class="text-xs text-gray-500">Max par poll</span>
+            <input type="number" name="notify_max_per_poll" min="1"
+                   value="{{ settings.notify_max_per_poll }}"
+                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-sm w-20 text-gray-700 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+          </label>
+        </div>
+
+        <div class="pt-2">
+          <button type="button" id="test-notif-btn" onclick="testNotification()"
+                  class="text-sm font-medium text-brand hover:underline">
+            Envoyer une notification test
+          </button>
+          <span id="test-notif-result" class="ml-2 text-xs"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Save -->
+    <button type="submit"
+            class="w-full bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-2xl transition-colors text-sm">
+      Enregistrer
+    </button>
+
+  </form>
+</div>
+
+<script>
+function geolocate() {
+  var btn = document.getElementById('geolocate-btn');
+  if (!navigator.geolocation) { btn.textContent = 'Non supporté'; return; }
+  btn.textContent = 'Localisation…';
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      document.getElementById('home_lat').value = pos.coords.latitude.toFixed(4);
+      document.getElementById('home_lon').value = pos.coords.longitude.toFixed(4);
+      btn.textContent = 'Me localiser';
+    },
+    function() { btn.textContent = 'Accès refusé'; }
+  );
+}
+function testNotification() {
+  var btn = document.getElementById('test-notif-btn');
+  var result = document.getElementById('test-notif-result');
+  btn.textContent = 'Envoi…';
+  result.textContent = '';
+  fetch('/api/notify/test', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      btn.textContent = 'Envoyer une notification test';
+      if (!data.enabled) {
+        result.textContent = 'Aucune URL configurée';
+        result.className = 'ml-2 text-xs text-amber-600';
+      } else if (data.sent) {
+        result.textContent = 'Envoyé !';
+        result.className = 'ml-2 text-xs text-emerald-600';
+      } else {
+        result.textContent = 'Échec — vérifie les logs';
+        result.className = 'ml-2 text-xs text-red-500';
+      }
+    })
+    .catch(function() {
+      btn.textContent = 'Envoyer une notification test';
+      result.textContent = 'Erreur réseau';
+      result.className = 'ml-2 text-xs text-red-500';
+    });
+}
+</script>
+
+{% endblock %}

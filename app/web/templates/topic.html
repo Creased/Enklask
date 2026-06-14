@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block content %}
+
+<!-- Breadcrumb + header -->
+<div class="flex items-center justify-between mb-5">
+  <div class="flex items-center gap-3 min-w-0">
+    <a href="/" class="text-gray-400 hover:text-gray-600 transition shrink-0">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/></svg>
+    </a>
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" class="text-gray-300 shrink-0"><path d="M6 3.5l4.5 4.5L6 12.5"/></svg>
+    <h1 class="text-xl font-bold text-gray-900 truncate">{{ topic.name }}</h1>
+    <span class="text-sm font-medium text-gray-400 shrink-0 whitespace-nowrap">{{ listing_count }} annonce{{ 's' if listing_count != 1 else '' }}</span>
+  </div>
+  <div class="flex items-center gap-2 shrink-0">
+    <a href="/t/{{ topic.slug }}/settings"
+       class="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-warm-100 transition" title="Paramètres du topic">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+      </svg>
+    </a>
+    <button
+      class="bg-brand hover:bg-brand-dark text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+      hx-post="/refresh/{{ topic.slug }}"
+      hx-target="#grid"
+      hx-swap="innerHTML"
+      hx-indicator="#refresh-spinner"
+    >
+      <span id="refresh-spinner" class="htmx-indicator mr-1">
+        <svg class="inline w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="31.4 31.4" stroke-linecap="round"/></svg>
+      </span>
+      Actualiser
+    </button>
+  </div>
+</div>
+
+<!-- Tag filter bar -->
+{% set all_tags = topic.all_tags %}
+{% if all_tags %}
+<div class="flex items-center gap-2 flex-wrap mb-4 overflow-x-auto pb-1 scrollbar-hide">
+  <a href="/t/{{ topic.slug }}"
+     class="tag-pill px-3 py-1.5 rounded-full text-xs font-semibold transition-colors
+            {% if not active_tags %}bg-gray-900 text-white{% else %}bg-warm-100 text-gray-500 hover:bg-warm-200{% endif %}">
+    Tous
+  </a>
+  {% for tag in all_tags %}
+  {% set is_active = tag in active_tags %}
+  <a href="/t/{{ topic.slug }}?{% for t in active_tags %}{% if t != tag %}tag={{ t }}&{% endif %}{% endfor %}{% if not is_active %}tag={{ tag }}{% endif %}"
+     class="tag-pill px-3 py-1.5 rounded-full text-xs font-semibold transition-colors
+            {% if is_active %}bg-gray-900 text-white{% else %}bg-warm-100 text-gray-500 hover:bg-warm-200{% endif %}">
+    {{ tag }}
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Filters -->
+<div class="bg-white rounded-2xl border border-warm-200 p-3 mb-5 flex flex-wrap gap-2 items-end"
+     hx-get="/partials/listings"
+     hx-target="#grid"
+     hx-swap="innerHTML"
+     hx-trigger="change, keyup changed delay:400ms from:input[name='keyword']"
+     hx-include="this"
+>
+  <input type="hidden" name="topic_id" value="{{ topic.id }}" />
+  {% for tag in active_tags %}
+  <input type="hidden" name="tag" value="{{ tag }}" />
+  {% endfor %}
+
+  <input type="text" name="keyword" value="{{ selected.keyword or '' }}" placeholder="Filtrer (mot-clé)"
+         class="text-sm bg-warm-50 border-0 rounded-xl px-3 py-2 w-44 text-gray-700 font-medium placeholder-gray-400 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+
+  <select name="source" class="filter-select text-sm bg-warm-50 border-0 rounded-xl px-3 py-2 text-gray-700 font-medium focus:ring-2 focus:ring-brand/20 focus:outline-none">
+    <option value="">Toutes sources</option>
+    {% for s in sources %}
+    <option value="{{ s }}" {% if selected.source == s %}selected{% endif %}>{{ s | capitalize }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="shipping" class="filter-select text-sm bg-warm-50 border-0 rounded-xl px-3 py-2 text-gray-700 font-medium focus:ring-2 focus:ring-brand/20 focus:outline-none">
+    <option value="">Livraison</option>
+    {% for key, label in shipping_labels.items() %}
+    <option value="{{ key }}" {% if selected.shipping == key %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+
+  <input type="number" name="price_min" min="0" step="1" placeholder="Prix min €"
+         value="{{ selected.price_min or '' }}"
+         class="text-sm bg-warm-50 border-0 rounded-xl px-3 py-2 w-28 text-gray-700 font-medium placeholder-gray-400 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+
+  <input type="number" name="price_max" min="0" step="1" placeholder="Prix max €"
+         value="{{ selected.price_max or '' }}"
+         class="text-sm bg-warm-50 border-0 rounded-xl px-3 py-2 w-28 text-gray-700 font-medium placeholder-gray-400 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+
+  <input type="number" name="distance_max" min="0" step="5" placeholder="Distance km"
+         value="{{ selected.distance_max or '' }}"
+         class="text-sm bg-warm-50 border-0 rounded-xl px-3 py-2 w-28 text-gray-700 font-medium placeholder-gray-400 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
+
+  <select name="status" class="filter-select text-sm bg-warm-50 border-0 rounded-xl px-3 py-2 text-gray-700 font-medium focus:ring-2 focus:ring-brand/20 focus:outline-none">
+    <option value="">Actifs</option>
+    {% for st in statuses %}
+    <option value="{{ st }}" {% if selected.status == st %}selected{% endif %}>{{ st | capitalize }}</option>
+    {% endfor %}
+  </select>
+
+  <select name="sort" class="filter-select text-sm bg-warm-50 border-0 rounded-xl px-3 py-2 text-gray-700 font-medium focus:ring-2 focus:ring-brand/20 focus:outline-none ml-auto">
+    <option value="relevance" {% if selected.sort == 'relevance' %}selected{% endif %}>Pertinence</option>
+    <option value="recent" {% if not selected.sort or selected.sort == 'recent' %}selected{% endif %}>Plus récentes</option>
+    <option value="oldest" {% if selected.sort == 'oldest' %}selected{% endif %}>Plus anciennes</option>
+    <option value="price_asc" {% if selected.sort == 'price_asc' %}selected{% endif %}>Prix croissants</option>
+    <option value="price_desc" {% if selected.sort == 'price_desc' %}selected{% endif %}>Prix décroissants</option>
+  </select>
+</div>
+
+<!-- Grid -->
+<div id="grid">
+  {% include "_grid.html" %}
+</div>
+
+{% endblock %}

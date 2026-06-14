@@ -1,0 +1,11 @@
+{% for listing in listings %}
+  {% include "_card.html" %}
+{% endfor %}
+{% if has_more %}
+<button class="col-span-full mx-auto mt-2 mb-4 px-5 py-2.5 text-sm font-semibold text-brand bg-brand-light rounded-xl hover:bg-brand/10 transition-colors"
+        hx-get="/partials/listings?{{ next_query }}"
+        hx-trigger="intersect once, click"
+        hx-swap="outerHTML">
+  Charger plus
+</button>
+{% endif %}

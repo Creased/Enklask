@@ -1,0 +1,57 @@
+<div id="topic-card-{{ ts.topic.id }}" class="topic-card group relative h-full rounded-2xl">
+  <a href="/t/{{ ts.topic.slug }}"
+     class="block bg-white rounded-2xl border border-warm-200 overflow-hidden flex flex-col h-full transition-colors duration-200">
+
+    <div class="p-5 flex flex-col gap-3 flex-1">
+      <!-- Header -->
+      <div class="pr-9 min-w-0">
+        <h3 class="font-semibold text-gray-900 truncate group-hover:text-brand transition-colors">{{ ts.topic.name }}</h3>
+        <p class="text-xs text-gray-400">{{ ts.search_count }} recherche{{ 's' if ts.search_count != 1 else '' }}</p>
+      </div>
+
+      <!-- Thumbnails strip -->
+      {% if ts.thumbnails %}
+      <div class="flex gap-1.5 overflow-hidden rounded-xl">
+        {% for thumb in ts.thumbnails[:4] %}
+        <div class="w-1/4 aspect-square bg-warm-100 overflow-hidden rounded-lg">
+          <img src="{{ thumb }}" alt="" loading="lazy" class="w-full h-full object-cover" />
+        </div>
+        {% endfor %}
+        {% for _ in range(4 - ts.thumbnails | length) %}
+        <div class="w-1/4 aspect-square bg-warm-100 rounded-lg"></div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="flex gap-1.5 rounded-xl">
+        {% for _ in range(4) %}
+        <div class="w-1/4 aspect-square bg-warm-100 rounded-lg"></div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <!-- Stats -->
+      <div class="flex items-center justify-between text-xs text-gray-400 mt-auto">
+        <span>
+          {{ ts.listing_count }} annonce{{ 's' if ts.listing_count != 1 else '' }}
+          {% if ts.new_count > 0 %}<span class="text-brand font-semibold">&middot; {{ ts.new_count }} nouvelle{{ 's' if ts.new_count != 1 else '' }}</span>{% endif %}
+        </span>
+        <span class="text-brand font-medium opacity-0 group-hover:opacity-100 transition-opacity">Voir &rarr;</span>
+      </div>
+    </div>
+  </a>
+
+  <!-- Refresh this topic (polls all its searches). Sibling of the link so it
+       doesn't trigger navigation. -->
+  <button hx-post="/refresh/{{ ts.topic.slug }}?view=card"
+          hx-target="#topic-card-{{ ts.topic.id }}"
+          hx-swap="outerHTML"
+          title="Actualiser ce topic"
+          class="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-lg bg-white/90 backdrop-blur border border-warm-200 text-gray-400 hover:text-brand hover:border-brand/30 transition shadow-sm">
+    <svg class="htmx-hide-on-request w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M13.6 8a5.6 5.6 0 11-1.7-4M13.6 2.2v3.2h-3.2"/>
+    </svg>
+    <svg class="htmx-indicator w-4 h-4 animate-spin text-brand" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="3" stroke-dasharray="42 16" stroke-linecap="round"/>
+    </svg>
+  </button>
+</div>
