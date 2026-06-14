@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     enable_vinted: bool = False
     enable_leboncoin: bool = False
     enable_facebook: bool = False
+    enable_rakuten: bool = False
+    enable_geev: bool = False
 
     # eBay Browse API (client-credentials OAuth)
     ebay_client_id: str = ""
@@ -42,6 +44,16 @@ class Settings(BaseSettings):
     # Facebook Marketplace (experimental)
     facebook_storage_state: str = "data/facebook_state.json"
     facebook_city: str = "rennes"
+
+    # Rakuten France (unofficial; the official Product Search API excludes used/C2C)
+    rakuten_base_url: str = "https://fr.shopping.rakuten.com"
+
+    # Geev (unofficial internal API; great for free/cheap local donor units)
+    geev_base_url: str = "https://prod.geev.fr"
+    geev_web_base: str = "https://www.geev.com"
+    geev_api_key: str = ""
+    # Search radius (km) around home for Geev's geo search.
+    geev_radius_km: int = 50
 
     # Notifications (Apprise). One or more URLs, comma or whitespace separated.
     apprise_urls: str = ""

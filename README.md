@@ -32,6 +32,8 @@ location and searches are configurable.
 | eBay                | Official Browse API            | ✅ Stable                       |
 | Vinted              | Unofficial internal JSON API   | ✅ Works (may break on changes) |
 | Leboncoin           | API + Playwright fallback      | ⚠️ Best effort (DataDome)       |
+| Rakuten France      | Public search (JSON-LD)        | ⚠️ Best effort                  |
+| Geev                | Unofficial internal API        | ⚠️ Best effort (free donor units)|
 | Facebook Marketplace| Headless browser (logged-in)   | 🧪 Experimental (opt-in)        |
 
 ## Quick start (local)
@@ -128,6 +130,13 @@ Covers the taxonomy classifier, dedup/upsert logic, and the eBay response parser
   `playwright install chromium`), it automatically falls back to a headless browser that
   reads ads from the page's embedded `__NEXT_DATA__`. If both are blocked, it reports an
   error and the other sources keep working.
+- **Rakuten France** — set `ENABLE_RAKUTEN=true`. Reads the public search page's standard
+  JSON-LD product data (Rakuten's *official* API excludes used/C2C deals, which are exactly
+  what we want). No credentials needed.
+- **Geev** — set `ENABLE_GEEV=true`. Searches around `HOME_LAT`/`HOME_LON` within
+  `GEEV_RADIUS_KM` — great for free/cheap **donor units** locally. Internal API; if it needs
+  auth, capture a bearer token from the app into `GEEV_API_KEY`. If it returns nothing, grab
+  one real request from the app/DevTools so the endpoint/params can be locked in.
 - **Facebook Marketplace** — set `ENABLE_FACEBOOK=true`, install the scraper deps
   (`pip install -r requirements-scrapers.txt && playwright install chromium`), and export a
   logged-in session to the path in `FACEBOOK_STORAGE_STATE` (a Playwright `storage_state`

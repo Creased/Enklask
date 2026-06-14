@@ -10,6 +10,8 @@ class Source(str, Enum):
     VINTED = "vinted"
     LEBONCOIN = "leboncoin"
     FACEBOOK = "facebook"
+    RAKUTEN = "rakuten"
+    GEEV = "geev"
 
 
 class ConsoleModel(str, Enum):
