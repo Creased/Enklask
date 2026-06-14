@@ -1,11 +1,6 @@
-import json
-
 from app.enums import Source
-from app.sources.leboncoin import (
-    LeboncoinSource,
-    _extract_ads_from_html,
-    _find_ads,
-)
+from app.sources.base import SearchQuery
+from app.sources.leboncoin import LeboncoinSource
 
 AD = {
     "list_id": 2890001,
@@ -47,38 +42,26 @@ def test_leboncoin_handles_missing_images():
     assert raw.price is None
 
 
-def test_find_ads_recurses_and_dedups():
-    blob = {
-        "props": {
-            "pageProps": {
-                "searchData": {
-                    "ads": [AD, {"list_id": 2890002, "subject": "Switch Lite"}],
-                }
-            }
-        },
-        # A duplicate of the same ad nested elsewhere should be collapsed.
-        "other": [AD],
-    }
-    ads = _find_ads(blob)
-    ids = sorted(a["list_id"] for a in ads)
-    assert ids == [2890001, 2890002]
-
-
-def test_extract_ads_from_next_data_html():
-    next_data = {"props": {"pageProps": {"ads": [AD]}}}
-    html = (
-        '<html><body><script id="__NEXT_DATA__" type="application/json">'
-        + json.dumps(next_data)
-        + "</script></body></html>"
+def test_build_body_maps_filters_to_native_params():
+    body = LeboncoinSource()._build_body(
+        SearchQuery(
+            query="switch",
+            sort="price_asc",
+            price_min=10,
+            price_max=200,
+            condition="for_parts",
+        )
     )
-    ads = _extract_ads_from_html(html)
-    assert len(ads) == 1
-    # The same _to_raw parser handles browser-sourced ads.
-    raw = LeboncoinSource()._to_raw(ads[0])
-    assert raw.source is Source.LEBONCOIN
-    assert raw.source_id == "2890001"
-    assert raw.price == 40.0
+    assert body["sort_by"] == "price"
+    assert body["sort_order"] == "asc"
+    assert body["filters"]["keywords"]["text"] == "switch"
+    assert body["filters"]["ranges"]["price"] == {"min": 10, "max": 200}
+    assert body["filters"]["enums"]["item_condition"] == ["5"]
 
 
-def test_extract_ads_from_html_without_next_data():
-    assert _extract_ads_from_html("<html>no data here</html>") == []
+def test_build_body_defaults_to_newest_no_filters():
+    body = LeboncoinSource()._build_body(SearchQuery(query="velo"))
+    assert (body["sort_by"], body["sort_order"]) == ("time", "desc")
+    assert "ranges" not in body["filters"]
+    assert "item_condition" not in body["filters"]["enums"]
+    assert body["listing_source"] == "direct-search"
