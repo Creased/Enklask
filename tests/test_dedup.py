@@ -34,11 +34,11 @@ def _raw(**kwargs) -> RawListing:
 def test_insert_then_dedup(session):
     from app.dedup import upsert_listing
 
-    assert upsert_listing(session, _raw()) is True
+    assert upsert_listing(session, _raw()) is not None
     session.commit()
 
     # Same source/source_id should not create a second row.
-    assert upsert_listing(session, _raw(price=25.0)) is False
+    assert upsert_listing(session, _raw(price=25.0)) is None
     session.commit()
 
     count = session.scalar(select(func.count()).select_from(Listing))

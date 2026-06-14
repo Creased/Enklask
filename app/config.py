@@ -43,6 +43,17 @@ class Settings(BaseSettings):
     facebook_storage_state: str = "data/facebook_state.json"
     facebook_city: str = "rennes"
 
+    # Notifications (Apprise). One or more URLs, comma or whitespace separated.
+    apprise_urls: str = ""
+    notify_on_first_run: bool = False
+    notify_max_per_poll: int = 15
+
+    @property
+    def apprise_url_list(self) -> list[str]:
+        """Parse ``apprise_urls`` into a clean list (comma/whitespace separated)."""
+        raw = self.apprise_urls.replace(",", " ")
+        return [u.strip() for u in raw.split() if u.strip()]
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ..db import get_session
 from ..enums import ListingStatus
 from ..models import Listing
+from ..notifier import Notifier
 from ..poller import poll_once
 from ..schemas import ListingOut, PollResultOut
 
@@ -96,6 +97,15 @@ def set_status(
     session.commit()
     session.refresh(listing)
     return listing
+
+
+@router.post("/notify/test")
+def notify_test():
+    """Send a sample notification to verify the Apprise configuration."""
+    notifier = Notifier.from_settings()
+    if not notifier.enabled:
+        return {"enabled": False, "sent": False}
+    return {"enabled": True, "sent": notifier.send_test()}
 
 
 @router.post("/refresh", response_model=PollResultOut)

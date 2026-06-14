@@ -14,10 +14,10 @@ from .sources.base import RawListing
 from .taxonomy import classify
 
 
-def upsert_listing(session: Session, raw: RawListing) -> bool:
+def upsert_listing(session: Session, raw: RawListing) -> Listing | None:
     """Insert ``raw`` as a Listing, or refresh ``last_seen`` if already known.
 
-    Returns True if a new listing was created, False if it already existed.
+    Returns the newly-created Listing, or ``None`` if it already existed.
     """
     existing = session.scalar(
         select(Listing).where(
@@ -30,7 +30,7 @@ def upsert_listing(session: Session, raw: RawListing) -> bool:
         # Refresh price (it can change) but keep user-set status.
         if raw.price is not None:
             existing.price = raw.price
-        return False
+        return None
 
     model_guess, part_guess = classify(raw.title, raw.description)
     settings = get_settings()
@@ -58,4 +58,4 @@ def upsert_listing(session: Session, raw: RawListing) -> bool:
         posted_at=raw.posted_at,
     )
     session.add(listing)
-    return True
+    return listing

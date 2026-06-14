@@ -7,11 +7,12 @@ import random
 import time
 from dataclasses import dataclass, field
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from .db import session_scope
 from .dedup import upsert_listing
-from .models import SavedSearch
+from .models import Listing, SavedSearch
+from .notifier import Notifier, NotifyItem
 from .sources.base import SearchQuery
 from .sources.registry import get_enabled_sources
 
@@ -39,7 +40,10 @@ def poll_once() -> PollResult:
         searches = list(
             session.scalars(select(SavedSearch).where(SavedSearch.enabled.is_(True)))
         )
+        # A cold start (empty DB) is a seeding run — don't blast notifications.
+        is_cold_start = session.scalar(select(func.count()).select_from(Listing)) == 0
 
+    new_items: list[NotifyItem] = []
     for search in searches:
         query = SearchQuery(
             query=search.query,
@@ -59,13 +63,23 @@ def poll_once() -> PollResult:
 
             with session_scope() as session:
                 for raw in raws:
-                    if upsert_listing(session, raw):
+                    listing = upsert_listing(session, raw)
+                    if listing is not None:
                         result.new_count += 1
+                        # Snapshot inside the session for later notification.
+                        new_items.append(NotifyItem.from_listing(listing))
                     else:
                         result.seen_count += 1
 
             # Be polite: small jittered pause between source calls.
             time.sleep(random.uniform(0.5, 1.5))
+
+    try:
+        Notifier.from_settings().notify_new(new_items, is_cold_start=is_cold_start)
+    except (KeyboardInterrupt, SystemExit):
+        raise
+    except BaseException:  # notifications must never break polling
+        logger.exception("Notification step failed")
 
     logger.info(
         "Poll complete: %d new, %d seen, sources=%s, errors=%s",

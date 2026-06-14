@@ -76,6 +76,39 @@ All settings live in `.env` (see `.env.example`). Highlights:
 Default saved searches (lot / pour pièces, carte mère, châssis, écran OLED, Lite HS) are
 seeded on first run.
 
+## Notifications (Apprise)
+
+Get pushed when a **new** ad appears, anywhere you like. The app uses
+[Apprise](https://github.com/caronc/apprise/wiki), so one or more destinations are
+configured as URL strings in `APPRISE_URLS` (comma or space separated):
+
+```bash
+# ntfy (free, no account — great on a phone)
+APPRISE_URLS=ntfy://ntfy.sh/mon-sujet-switch
+# Telegram bot
+APPRISE_URLS=tgram://123456:ABC-DEF.../987654321
+# Several at once
+APPRISE_URLS=ntfy://ntfy.sh/switch, discord://id/token
+```
+
+Each new ad sends one push (title with source + price, body with model/part tags,
+location/distance, and the direct link; the photo is attached when available).
+
+Flood guards:
+- **First run is silent.** When the database is empty, that poll just seeds it — no
+  alerts. Set `NOTIFY_ON_FIRST_RUN=true` to override.
+- **Big batches digest.** If a single poll finds more than `NOTIFY_MAX_PER_POLL` (15)
+  new ads, you get one summary message instead of a flood.
+- Delivery is best-effort and isolated — a bad URL or a failing service is logged and
+  never interrupts polling.
+
+Verify your setup any time:
+
+```bash
+curl -X POST http://localhost:8000/api/notify/test
+# -> {"enabled": true, "sent": true}
+```
+
 ## Tests
 
 ```bash
@@ -102,5 +135,5 @@ Covers the taxonomy classifier, dedup/upsert logic, and the eBay response parser
 
 ## Roadmap
 
-- Telegram push notifications for new matches (currently dashboard-only).
 - Saved-search management UI in the dashboard.
+- Per-notification-target routing (e.g. only alert on OLED motherboards under 30€).
