@@ -58,14 +58,45 @@ Without credentials the app still runs — the eBay source simply reports as dis
 
 ## Run with Docker (recommended for an always-on mini server)
 
+**Prerequisites:** Docker Engine + Docker Compose v2 (or Docker Desktop on macOS/Windows).
+
+**Boot it up** (works with zero config — no API keys needed to start):
+
 ```bash
-cp .env.example .env        # fill in keys
+cp .env.example .env          # required: Compose reads .env (it can stay all-default)
+docker compose up -d --build  # build the image and start in the background
+```
+
+**Verify it's running:**
+
+```bash
+curl -s localhost:8000/healthz      # -> {"status":"ok"}
+```
+
+Then open <http://localhost:8000>. With no keys configured this is expected to show
+**"Aucune source configurée"** and an empty feed — that's the correct boot-only state and
+confirms the whole stack (API, dashboard, scheduler) is up.
+
+**Operate:**
+
+```bash
+docker compose logs -f        # watch polling activity
+docker compose down           # stop (data is kept)
+```
+
+The SQLite database persists in `./data/ad_tracker.db`, so your ads survive restarts.
+
+**Turn on a real source** when ready: edit `.env` — e.g. add your eBay
+`EBAY_CLIENT_ID` / `EBAY_CLIENT_SECRET`, or set `ENABLE_VINTED=true` / `ENABLE_GEEV=true` —
+then re-apply:
+
+```bash
 docker compose up -d --build
 ```
 
-The SQLite database persists in `./data`. Works on a Raspberry Pi / small box for the
-API-based sources. The browser-based sources (Leboncoin fallback, Facebook) need
-Playwright and are best run on x86 — see `requirements-scrapers.txt`.
+Works on a Raspberry Pi / small box for the API-based sources. The browser-based sources
+(Leboncoin fallback, Facebook) need Playwright and are best run on x86 — see
+`requirements-scrapers.txt`.
 
 ## Configuration
 
@@ -73,7 +104,8 @@ All settings live in `.env` (see `.env.example`). Highlights:
 
 - `POLL_INTERVAL_MINUTES` — how often to poll (default 10).
 - `HOME_LAT` / `HOME_LON` — your location for distance (default Rennes).
-- `ENABLE_EBAY` / `ENABLE_VINTED` / `ENABLE_LEBONCOIN` / `ENABLE_FACEBOOK` — per-source toggles.
+- `ENABLE_EBAY` / `ENABLE_VINTED` / `ENABLE_LEBONCOIN` / `ENABLE_FACEBOOK` /
+  `ENABLE_RAKUTEN` / `ENABLE_GEEV` — per-source toggles.
 
 Default saved searches (lot / pour pièces, carte mère, châssis, écran OLED, Lite HS) are
 seeded on first run.
