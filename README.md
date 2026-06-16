@@ -94,9 +94,9 @@ then re-apply:
 docker compose up -d --build
 ```
 
-Works on a Raspberry Pi / small box for the API-based sources. The browser-based sources
-(Leboncoin fallback, Facebook) need Playwright and are best run on x86 — see
-`requirements-scrapers.txt`.
+Works on a Raspberry Pi / small box — every source crawls over plain HTTP (no browser).
+Only the optional standalone Leboncoin crawler (`scripts/lbc_crawl.py`) needs Playwright;
+see `requirements-scrapers.txt`. The app itself never does.
 
 ## Configuration
 
@@ -169,12 +169,11 @@ Covers the taxonomy classifier, dedup/upsert logic, and the eBay response parser
   `GEEV_RADIUS_KM` — great for free/cheap **donor units** locally. Internal API; if it needs
   auth, capture a bearer token from the app into `GEEV_API_KEY`. If it returns nothing, grab
   one real request from the app/DevTools so the endpoint/params can be locked in.
-- **Facebook Marketplace** — set `ENABLE_FACEBOOK=true`. Works **logged out**: it harvests
-  the `lsd` token + GraphQL `doc_id` from the public search page (browser-TLS via `curl_cffi`,
-  no account, no browser) and replays the Marketplace search around `HOME_LAT`/`HOME_LON`.
-  A logged-in Playwright `storage_state` at `FACEBOOK_STORAGE_STATE` is an optional fallback
-  if the anonymous path gets blocked. Most ToS-sensitive source and the `doc_id` rotates with
-  FB deploys (re-harvested each search) — use sparingly.
+- **Facebook Marketplace** — set `ENABLE_FACEBOOK=true`. Works **logged out, no account**: it
+  harvests the `lsd` token + GraphQL `doc_id` from the public search page (browser-TLS via
+  `curl_cffi`) and replays the Marketplace search around `HOME_LAT`/`HOME_LON`. Most
+  ToS-sensitive source, and the `doc_id` rotates with FB deploys (re-harvested each search) —
+  use sparingly.
 
 ## Roadmap
 

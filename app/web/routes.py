@@ -839,7 +839,6 @@ async def settings_save(request: Request):
     str_fields = [
         "ebay_client_id", "ebay_client_secret", "ebay_marketplace_id",
         "vinted_base_url", "leboncoin_base_url",
-        "facebook_storage_state", "facebook_city",
         "rakuten_base_url",
         "geev_base_url", "geev_web_base", "geev_api_key",
         "cookies_file",

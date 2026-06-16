@@ -11,16 +11,15 @@ account, no browser.
 The ``doc_id`` rotates with FB deploys and the ``lsd`` token is per-page, so both
 are harvested fresh on every search rather than hardcoded.
 
-If ``curl_cffi`` is unavailable or the anonymous path gets blocked, it falls back
-to the legacy logged-in Playwright scraper — but only when a storage-state file
-is configured. Playwright stays an optional dependency, imported lazily.
+``curl_cffi`` is required (it supplies the browser fingerprint). There is no
+logged-in/browser fallback — no account is ever needed. The search uses the
+home location from the general settings (``HOME_LAT``/``HOME_LON``).
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 from datetime import datetime, timezone
 from urllib.parse import quote
@@ -49,9 +48,6 @@ _LSD_RE = re.compile(r'"LSD",\[\],\{"token":"([^"]+)"')
 _PRELOADER_RE = re.compile(
     r'"adp_' + _FRIENDLY_NAME + r'RelayPreloader_[^"]*","queryID":"(\d+)","variables":'
 )
-
-_ITEM_ID_RE = re.compile(r"/marketplace/item/(\d+)")
-_PRICE_RE = re.compile(r"(\d[\d\s.,]*)\s*€")
 
 # Item-detail page extraction (the search feed has no description/date). The
 # viewed listing is the only one carrying redacted_description; creation_time
@@ -104,26 +100,11 @@ class FacebookSource(BaseSource):
         return bool(self._settings.enable_facebook)
 
     def search(self, query: SearchQuery) -> list[RawListing]:
-        if HAVE_CURL_CFFI:
-            try:
-                return self._search_anonymous(query)
-            except FacebookBlocked as exc:
-                if not self._has_login_session():
-                    raise
-                logger.warning(
-                    "Facebook anonymous search blocked (%s); falling back to "
-                    "logged-in browser.", exc,
-                )
-        if self._has_login_session():
-            return self._parse_cards(self._collect_cards(query.query))
-        raise FacebookBlocked(
-            "curl_cffi is unavailable and no logged-in Playwright session is "
-            "configured — cannot reach Facebook Marketplace."
-        )
-
-    def _has_login_session(self) -> bool:
-        state = self._settings.facebook_storage_state
-        return bool(state and os.path.exists(state))
+        if not HAVE_CURL_CFFI:
+            raise FacebookBlocked(
+                "curl_cffi is required for Facebook Marketplace (browser-TLS transport)."
+            )
+        return self._search_anonymous(query)
 
     # -- per-listing enrichment (description + date) -------------------------
     def enrich(self, raw: RawListing) -> None:
@@ -317,85 +298,6 @@ class FacebookSource(BaseSource):
             location_city=geocode.get("city"),
         )
 
-    # -- legacy logged-in Playwright fallback (not unit-tested) --------------
-    def _collect_cards(self, text: str) -> list[dict]:
-        try:
-            from playwright.sync_api import sync_playwright
-        except ImportError as exc:  # pragma: no cover
-            raise RuntimeError(
-                "Playwright is not installed. Install requirements-scrapers.txt "
-                "and run `playwright install chromium`."
-            ) from exc
-
-        city = self._settings.facebook_city
-        url = (
-            f"https://www.facebook.com/marketplace/{city}/search/"
-            f"?query={quote(text)}&sortBy=creation_time_descend"
-        )
-
-        results: list[dict] = []
-        with sync_playwright() as p:  # pragma: no cover
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context(
-                storage_state=self._settings.facebook_storage_state
-            )
-            page = context.new_page()
-            page.goto(url, wait_until="domcontentloaded", timeout=45000)
-            page.wait_for_timeout(4000)
-            for _ in range(3):
-                page.mouse.wheel(0, 4000)
-                page.wait_for_timeout(1500)
-
-            results = page.eval_on_selector_all(
-                'a[href*="/marketplace/item/"]',
-                """els => els.map(a => {
-                    const img = a.querySelector('img');
-                    return {
-                        href: a.href,
-                        text: a.innerText,
-                        image: img ? img.src : null
-                    };
-                })""",
-            )
-            browser.close()
-        return results
-
-    def _parse_cards(self, cards: list[dict]) -> list[RawListing]:
-        listings: list[RawListing] = []
-        seen: set[str] = set()
-        for card in cards:
-            raw = self._parse_card(card)
-            if raw is None or raw.source_id in seen:
-                continue
-            seen.add(raw.source_id)
-            listings.append(raw)
-        return listings
-
-    def _parse_card(self, card: dict) -> RawListing | None:
-        href = card.get("href") or ""
-        match = _ITEM_ID_RE.search(href)
-        if not match:
-            return None
-        item_id = match.group(1)
-
-        lines = [ln.strip() for ln in (card.get("text") or "").splitlines() if ln.strip()]
-        price = _extract_price(lines)
-        non_price = [ln for ln in lines if "€" not in ln]
-        title = non_price[0] if non_price else (lines[0] if lines else "Annonce Marketplace")
-        location = non_price[-1] if len(non_price) > 1 else None
-
-        return RawListing(
-            source=Source.FACEBOOK,
-            source_id=item_id,
-            title=title,
-            url=f"https://www.facebook.com/marketplace/item/{item_id}/",
-            price=price,
-            currency="EUR",
-            thumbnail=card.get("image"),
-            photos=[card["image"]] if card.get("image") else [],
-            location_city=location,
-        )
-
 
 def _apply_price_filter(listings: list[RawListing], query: SearchQuery) -> list[RawListing]:
     """Filter by price using the reliable decimal amount (FB's native price
@@ -454,16 +356,6 @@ def _currency_from_formatted(formatted: str | None) -> str:
     if "£" in formatted:
         return "GBP"
     return "EUR"
-
-
-def _extract_price(lines: list[str]) -> float | None:
-    for line in lines:
-        m = _PRICE_RE.search(line)
-        if m:
-            digits = re.sub(r"[^\d]", "", m.group(1))
-            if digits:
-                return float(digits)
-    return None
 
 
 def _to_float(value, default=None):

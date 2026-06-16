@@ -48,10 +48,6 @@ class Settings(BaseModel):
     # Leboncoin (unofficial)
     leboncoin_base_url: str = "https://api.leboncoin.fr"
 
-    # Facebook Marketplace (experimental)
-    facebook_storage_state: str = "data/facebook_state.json"
-    facebook_city: str = "rennes"
-
     # Rakuten France
     rakuten_base_url: str = "https://fr.shopping.rakuten.com"
 

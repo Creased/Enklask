@@ -1,10 +1,8 @@
 # Slim image — no browser needed. curl_cffi (in requirements.txt) impersonates a
-# real browser's TLS/HTTP2 fingerprint, so Vinted, eBay, Leboncoin and Facebook
-# Marketplace all crawl over plain HTTP past their bot checks. No
-# Playwright/Chromium/Xvfb.
-#
-# (Facebook's logged-in scraper is an optional Playwright fallback only; install
-# requirements-scrapers.txt and run `playwright install chromium` to enable it.)
+# real browser's TLS/HTTP2 fingerprint, so every source (Vinted, eBay, Leboncoin,
+# Facebook Marketplace, Rakuten, Geev) crawls over plain HTTP past its bot checks.
+# No Playwright/Chromium/Xvfb. (The optional scripts/lbc_crawl.py crawler uses
+# Playwright — see requirements-scrapers.txt — but the app itself does not.)
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \

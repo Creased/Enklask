@@ -141,19 +141,11 @@
         <!-- Facebook -->
         <div class="px-5 py-4">
           <label class="flex items-center justify-between cursor-pointer">
-            <div class="flex items-center gap-2.5">
-              <span class="text-sm font-semibold text-indigo-600">Facebook</span>
-              <span class="text-xs text-gray-400">expérimental</span>
-            </div>
+            <span class="text-sm font-semibold text-indigo-600">Facebook</span>
             <input type="checkbox" name="enable_facebook" {% if settings.enable_facebook %}checked{% endif %} class="sr-only peer" />
             <div class="toggle-track peer"></div>
           </label>
-          <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <input type="text" name="facebook_storage_state" value="{{ settings.facebook_storage_state }}" placeholder="storage-state (optionnel, fallback)"
-                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-xs text-gray-600 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
-            <input type="text" name="facebook_city" value="{{ settings.facebook_city }}" placeholder="Ville"
-                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-xs text-gray-600 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
-          </div>
+          <p class="text-xs text-gray-400 mt-2">Aucun compte requis · localisation depuis les réglages généraux.</p>
         </div>
 
         <input type="hidden" name="vinted_base_url" value="{{ settings.vinted_base_url }}" />
