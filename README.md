@@ -9,20 +9,23 @@ A fitting name for a tool that quietly investigates the marketplaces and reports
 
 </div>
 
-A self-hosted tracker that watches second-hand marketplaces for **Nintendo Switch
-parts** — job lots, "for parts" consoles, motherboards, chassis, screens — across
-**eBay, Vinted, Leboncoin and Facebook Marketplace** (France), and shows them in a
-single dashboard with photos, price, location and a one-click link to the original ad.
+A self-hosted tracker that watches second-hand marketplaces for **whatever you're
+hunting**. Define searches grouped into topics and it aggregates the matching ads
+across **eBay, Vinted, Leboncoin, Facebook Marketplace, Rakuten and Geev** (France)
+in a single dashboard — photos, price, price-drop history, location, and a one-click
+link to the original ad.
 
-Built for Switch repair hunting (V1 / V2 / Lite / OLED) around Rennes, but the home
-location and searches are configurable.
+It started as a Nintendo-Switch-repair-parts hunter around Rennes (job lots, "for
+parts" consoles, motherboards, screens), but every search, topic and the home
+location is configurable — track anything: a console, a bike, a camera lens, a couch.
 
-> **Heads-up on data sources.** Only **eBay** offers an official API. Vinted,
-> Leboncoin and Facebook Marketplace have **no public API**, so those adapters use
-> unofficial endpoints / a headless browser. They can break when the sites change and
-> using them may be against those sites' Terms of Service. Each source can be toggled
-> independently, so the app stays useful even with eBay alone. This is a **personal-use**
-> tool with conservative, low-volume polling — please use it responsibly.
+> **Heads-up on data sources.** Only **eBay** offers an official API. The others
+> (Vinted, Leboncoin, Facebook Marketplace, Rakuten, Geev) have **no public API**, so
+> their adapters hit unofficial endpoints through a browser-TLS fingerprint
+> (`curl_cffi`) — no real browser. They can break when the sites change, and using them
+> may be against those sites' Terms of Service. Each source toggles independently, so
+> the app stays useful even with eBay alone. This is a **personal-use** tool with
+> conservative, low-volume polling — please use it responsibly.
 
 ## Features
 
