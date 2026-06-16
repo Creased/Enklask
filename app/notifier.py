@@ -17,6 +17,7 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from urllib.parse import parse_qs, unquote, urlsplit
 
 import httpx
 
@@ -35,28 +36,41 @@ _SOURCE_COLOR = {
 }
 _DEFAULT_COLOR = 0xE63946  # brand red
 
-_DISCORD_SCHEME_RE = re.compile(r"^discord(?:app)?://", re.I)
 _DISCORD_WEBHOOK_RE = re.compile(
     r"https?://(?:ptb\.|canary\.)?discord(?:app)?\.com/api/webhooks/(\d+)/([\w-]+)", re.I
 )
 
 
-def discord_webhook(url: str) -> str | None:
-    """Convert an Apprise ``discord://id/token`` URL (or a raw Discord webhook
-    URL) into the REST webhook endpoint. Returns None if it isn't Discord."""
+def parse_discord_target(url: str) -> dict | None:
+    """Parse an Apprise ``discord://[botname@]id/token`` URL (or a raw Discord
+    webhook URL) into ``{webhook, username, avatar_url}``. The username/avatar
+    come from the ``discord://`` botname and ``?avatar_url=`` so posting directly
+    keeps the same bot identity Apprise used. Returns None if it isn't Discord.
+    """
     s = (url or "").strip()
-    m = _DISCORD_WEBHOOK_RE.match(s)
-    if m:
-        return f"https://discord.com/api/webhooks/{m.group(1)}/{m.group(2)}"
-    if _DISCORD_SCHEME_RE.match(s):
-        rest = _DISCORD_SCHEME_RE.sub("", s).split("?", 1)[0].split("#", 1)[0]
-        head, _, tail = rest.partition("/")
-        if "@" in head:  # discord://botname@id/token
-            head = head.split("@", 1)[1]
-        parts = [p for p in (head + "/" + tail).split("/") if p]
-        if len(parts) >= 2 and parts[0].isdigit():
-            return f"https://discord.com/api/webhooks/{parts[0]}/{parts[1]}"
-    return None
+    u = urlsplit(s)
+    scheme = u.scheme.lower()
+    webhook = username = None
+    if scheme in ("discord", "discordapp"):
+        userinfo, _, host = u.netloc.rpartition("@")
+        username = userinfo or None
+        ids = [p for p in ([host] + u.path.split("/")) if p]
+        if len(ids) >= 2 and ids[0].isdigit():
+            webhook = f"https://discord.com/api/webhooks/{ids[0]}/{ids[1]}"
+    elif scheme in ("http", "https"):
+        m = _DISCORD_WEBHOOK_RE.match(s)
+        if m:
+            webhook = f"https://discord.com/api/webhooks/{m.group(1)}/{m.group(2)}"
+    if not webhook:
+        return None
+
+    q = parse_qs(u.query)
+    avatar_url = (q.get("avatar_url") or [None])[0]
+    if avatar_url:
+        avatar_url = unquote(avatar_url)
+    if not username:
+        username = (q.get("username") or [None])[0]
+    return {"webhook": webhook, "username": username, "avatar_url": avatar_url}
 
 
 @dataclass
@@ -97,11 +111,14 @@ class Notifier:
     ) -> None:
         self._urls = urls
         # Split Discord webhooks (rich embeds) from everything else (Apprise text).
-        self._discord: list[str] = []
+        self._discord: list[dict] = []
         self._other: list[str] = []
         for u in urls:
-            webhook = discord_webhook(u)
-            (self._discord if webhook else self._other).append(webhook or u)
+            target = parse_discord_target(u)
+            if target:
+                self._discord.append(target)
+            else:
+                self._other.append(u)
         self._max_per_poll = max_per_poll
         self._notify_on_first_run = notify_on_first_run
 
@@ -205,8 +222,8 @@ class Notifier:
                 "Discord sont prêtes ✅ (la photo de l'annonce s'affichera ici).",
             )
             embed = self.build_embed(sample)
-            for webhook in self._discord:
-                ok = self._post_discord(webhook, embed) or ok
+            for target in self._discord:
+                ok = self._post_discord(target, embed) or ok
         if self._other:
             label = f"[{topic_name}] " if topic_name else ""
             ok = self._send(
@@ -221,8 +238,8 @@ class Notifier:
         sent = False
         if self._discord:
             embed = self.build_embed(item)
-            for webhook in self._discord:
-                sent = self._post_discord(webhook, embed) or sent
+            for target in self._discord:
+                sent = self._post_discord(target, embed) or sent
         if self._other:
             title, body = self.format_listing(item)
             sent = self._send(title, body, urls=self._other) or sent
@@ -240,9 +257,14 @@ class Notifier:
             lines.append(f"… et {len(items) - len(shown)} de plus")
         return title, "\n".join(lines)
 
-    def _post_discord(self, webhook: str, embed: dict) -> bool:
+    def _post_discord(self, target: dict, embed: dict) -> bool:
+        payload: dict = {"embeds": [embed]}
+        if target.get("username"):
+            payload["username"] = target["username"]
+        if target.get("avatar_url"):
+            payload["avatar_url"] = target["avatar_url"]
         try:
-            resp = httpx.post(webhook, json={"embeds": [embed]}, timeout=15.0)
+            resp = httpx.post(target["webhook"], json=payload, timeout=15.0)
             if resp.status_code in (200, 204):
                 return True
             logger.warning(

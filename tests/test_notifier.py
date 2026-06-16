@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from app.notifier import Notifier, NotifyItem, discord_webhook
+from app.notifier import Notifier, NotifyItem, parse_discord_target
 
 
 def _item(i: int = 0, **kw) -> NotifyItem:
@@ -93,17 +93,26 @@ def test_send_swallows_base_exception():
 
 # --- Discord rich-embed path -----------------------------------------------
 
-def test_discord_webhook_parsing():
-    assert discord_webhook("discord://123/abc-DEF_9") == \
-        "https://discord.com/api/webhooks/123/abc-DEF_9"
-    assert discord_webhook("discord://MyBot@123/abc") == \
+def test_parse_discord_target():
+    t = parse_discord_target("discord://123/abc-DEF_9")
+    assert t["webhook"] == "https://discord.com/api/webhooks/123/abc-DEF_9"
+    assert t["username"] is None and t["avatar_url"] is None
+
+    t = parse_discord_target("discord://MyBot@123/abc")
+    assert t["webhook"] == "https://discord.com/api/webhooks/123/abc"
+    assert t["username"] == "MyBot"
+
+    # Trailing slash + query params (avatar carried through, format/fields ignored).
+    t = parse_discord_target(
+        "discord://123/abc/?format=text&fields=no&avatar_url=https://x/y.png"
+    )
+    assert t["webhook"] == "https://discord.com/api/webhooks/123/abc"
+    assert t["avatar_url"] == "https://x/y.png"
+
+    assert parse_discord_target("https://discordapp.com/api/webhooks/123/abc")["webhook"] == \
         "https://discord.com/api/webhooks/123/abc"
-    assert discord_webhook("discord://123/abc?format=markdown") == \
-        "https://discord.com/api/webhooks/123/abc"
-    assert discord_webhook("https://discordapp.com/api/webhooks/123/abc") == \
-        "https://discord.com/api/webhooks/123/abc"
-    assert discord_webhook("ntfy://ntfy.sh/topic") is None
-    assert discord_webhook("json://example") is None
+    assert parse_discord_target("ntfy://ntfy.sh/topic") is None
+    assert parse_discord_target("json://example") is None
 
 
 def test_build_embed_full():
@@ -132,13 +141,29 @@ def test_build_embed_omits_missing():
 
 def test_discord_target_gets_embed_not_text():
     n = Notifier(urls=["discord://123/tok"])
-    assert n._discord == ["https://discord.com/api/webhooks/123/tok"]
+    assert n._discord[0]["webhook"] == "https://discord.com/api/webhooks/123/tok"
     assert n._other == []
     with patch.object(Notifier, "_post_discord", return_value=True) as post, \
             patch.object(Notifier, "_send") as send:
         assert n.notify_new([_item()]) == 1
         post.assert_called_once()
         send.assert_not_called()  # no non-Discord services, so no Apprise text
+
+
+def test_post_discord_payload_carries_identity():
+    n = Notifier(urls=["discord://MyBot@1/tok?avatar_url=https://x/y.png"])
+    target = n._discord[0]
+
+    class _Resp:
+        status_code = 204
+        text = ""
+
+    with patch("app.notifier.httpx.post", return_value=_Resp()) as post:
+        assert n._post_discord(target, {"title": "t"}) is True
+    body = post.call_args.kwargs["json"]
+    assert body["embeds"] == [{"title": "t"}]
+    assert body["username"] == "MyBot"
+    assert body["avatar_url"] == "https://x/y.png"
 
 
 def test_mixed_targets_get_both():
