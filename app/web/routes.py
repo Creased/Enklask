@@ -210,13 +210,42 @@ def _topic_stat(session: Session, topic: Topic) -> dict:
     }
 
 
+def _source_statuses(session: Session) -> list[dict]:
+    """Per-source health for the home page.
+
+    ok (green) = returning listings recently, warn (orange) = has listings but
+    none lately, error (red) = enabled but nothing yet. Derived from
+    ``last_seen`` (bumped on every poll for any source that returns results), so
+    it needs no extra tracking and survives restarts.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    settings = get_settings()
+    window = max(settings.poll_interval_minutes * 2, 20)
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=window)
+    statuses: list[dict] = []
+    for source in get_enabled_sources():
+        name = source.name.value
+        total = session.scalar(
+            select(func.count()).select_from(Listing).where(Listing.source == name)
+        ) or 0
+        recent = session.scalar(
+            select(func.count())
+            .select_from(Listing)
+            .where(Listing.source == name, Listing.last_seen >= cutoff)
+        ) or 0
+        state = "ok" if recent else ("warn" if total else "error")
+        statuses.append({"name": name, "state": state, "recent": recent, "total": total})
+    return statuses
+
+
 @router.get("/", response_class=HTMLResponse)
 def home(request: Request, session: Session = Depends(get_session)):
     topics = list(session.scalars(select(Topic).order_by(Topic.position, Topic.id)))
     return templates.TemplateResponse("home.html", {
         "request": request,
         "topic_stats": [_topic_stat(session, t) for t in topics],
-        "enabled_sources": [s.name.value for s in get_enabled_sources()],
+        "source_status": _source_statuses(session),
     })
 
 
