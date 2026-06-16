@@ -34,7 +34,7 @@ location and searches are configurable.
 | Leboncoin           | Unofficial API (browser-TLS)   | ✅ Works (no key)               |
 | Rakuten France      | Public search (JSON-LD)        | ⚠️ Best effort                  |
 | Geev                | Unofficial internal API        | ⚠️ Best effort (free donor units)|
-| Facebook Marketplace| Headless browser (logged-in)   | 🧪 Experimental (opt-in)        |
+| Facebook Marketplace| Public GraphQL (browser-TLS)    | ✅ Works (no account)           |
 
 ## Quick start (local)
 
@@ -169,10 +169,12 @@ Covers the taxonomy classifier, dedup/upsert logic, and the eBay response parser
   `GEEV_RADIUS_KM` — great for free/cheap **donor units** locally. Internal API; if it needs
   auth, capture a bearer token from the app into `GEEV_API_KEY`. If it returns nothing, grab
   one real request from the app/DevTools so the endpoint/params can be locked in.
-- **Facebook Marketplace** — set `ENABLE_FACEBOOK=true`, install the scraper deps
-  (`pip install -r requirements-scrapers.txt && playwright install chromium`), and export a
-  logged-in session to the path in `FACEBOOK_STORAGE_STATE` (a Playwright `storage_state`
-  JSON). Off until that file exists. Most fragile / ToS-sensitive — use sparingly.
+- **Facebook Marketplace** — set `ENABLE_FACEBOOK=true`. Works **logged out**: it harvests
+  the `lsd` token + GraphQL `doc_id` from the public search page (browser-TLS via `curl_cffi`,
+  no account, no browser) and replays the Marketplace search around `HOME_LAT`/`HOME_LON`.
+  A logged-in Playwright `storage_state` at `FACEBOOK_STORAGE_STATE` is an optional fallback
+  if the anonymous path gets blocked. Most ToS-sensitive source and the `doc_id` rotates with
+  FB deploys (re-harvested each search) — use sparingly.
 
 ## Roadmap
 
