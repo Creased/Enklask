@@ -1,6 +1,13 @@
+from datetime import datetime, timezone
+
 from app.enums import Source
 from app.sources.base import SearchQuery
-from app.sources.facebook import FacebookSource, _apply_price_filter, _build_search_url
+from app.sources.facebook import (
+    FacebookSource,
+    _apply_price_filter,
+    _build_search_url,
+    _parse_item_detail,
+)
 
 # --- Logged-in Playwright fallback parser (legacy card scraping) -----------
 
@@ -113,6 +120,32 @@ def test_facebook_condition_omitted_when_unset_or_unknown():
     assert "itemCondition" not in _build_search_url(
         SearchQuery("switch", condition="whatever")
     )
+
+
+# --- Item-page enrichment parser (description + date) ----------------------
+
+# Real fragment shape from a logged-out item page (escapes preserved).
+ITEM_HTML = (
+    '"id":"1471223564500809"},"story":null,'
+    '"redacted_description":{"text":"Je vend une swirch lite grise a r\\u00e9par\\u00e9 '
+    'j\\u2019en demande 50 vendu avec chargeur donne avec l\\u2019\\u00e9cran a changer"},'
+    '"creation_time":1773956097,"location_text":{"text":"Camors, BRE"},"is_viewer_seller":false'
+)
+
+
+def test_facebook_parse_item_detail():
+    d = _parse_item_detail(ITEM_HTML)
+    assert d["description"].startswith("Je vend une swirch lite grise a réparé")
+    assert "écran a changer" in d["description"]
+    assert d["posted_at"] == datetime.fromtimestamp(1773956097, tz=timezone.utc).replace(
+        tzinfo=None
+    )
+    assert d["location_city"] == "Camors"
+
+
+def test_facebook_parse_item_detail_missing_returns_empty():
+    d = _parse_item_detail('{"something":"else"}')
+    assert d == {"description": "", "posted_at": None, "location_city": None}
 
 
 def test_facebook_price_filter_uses_decimal_amount():

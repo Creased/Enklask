@@ -78,3 +78,13 @@ class BaseSource(abc.ABC):
     @abc.abstractmethod
     def search(self, query: SearchQuery) -> list[RawListing]:
         """Return raw listings matching ``query`` (newest first when possible)."""
+
+    def enrich(self, raw: RawListing) -> None:
+        """Optionally fill in extra fields (description, date, …) on ``raw`` in
+        place, for a listing that's about to be stored for the first time.
+
+        Called once per newly-seen listing — never for already-known ones — so an
+        adapter can fetch detail too expensive to gather for every search result.
+        Must be best-effort and never raise. Default: no-op.
+        """
+        return None

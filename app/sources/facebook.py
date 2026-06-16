@@ -22,6 +22,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime, timezone
 from urllib.parse import quote
 
 from ..config import get_settings
@@ -51,6 +52,14 @@ _PRELOADER_RE = re.compile(
 
 _ITEM_ID_RE = re.compile(r"/marketplace/item/(\d+)")
 _PRICE_RE = re.compile(r"(\d[\d\s.,]*)\s*€")
+
+# Item-detail page extraction (the search feed has no description/date). The
+# viewed listing is the only one carrying redacted_description; creation_time
+# and location_text follow it in the embedded JSON.
+_ITEM_URL = "https://www.facebook.com/marketplace/item/{}/"
+_DESC_RE = re.compile(r'"redacted_description":\{"text":"((?:\\.|[^"\\])*)"')
+_CTIME_RE = re.compile(r'"creation_time":(\d+)')
+_LOC_TEXT_RE = re.compile(r'"location_text":\{"text":"((?:\\.|[^"\\])*)"')
 
 # Generic condition bucket -> FB Marketplace itemCondition code. FB has no
 # "for parts" condition, so map it to the closest (used_fair). FB's valid set:
@@ -115,6 +124,45 @@ class FacebookSource(BaseSource):
     def _has_login_session(self) -> bool:
         state = self._settings.facebook_storage_state
         return bool(state and os.path.exists(state))
+
+    # -- per-listing enrichment (description + date) -------------------------
+    def enrich(self, raw: RawListing) -> None:
+        """Fill in the description and posted date from the item page.
+
+        The search feed omits both, so this fetches the (logged-out) item page
+        and parses its embedded JSON. Called once per newly-seen listing by the
+        poller. Best-effort: any failure leaves the listing's feed data intact.
+        """
+        if not HAVE_CURL_CFFI or raw.source is not Source.FACEBOOK or not raw.source_id:
+            return
+        try:
+            session = cffi_requests.Session(impersonate=_IMPERSONATE)
+            try:
+                resp = session.get(
+                    _ITEM_URL.format(raw.source_id),
+                    headers={
+                        "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+                        "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
+                    },
+                    timeout=30.0,
+                    allow_redirects=True,
+                )
+            finally:
+                try:
+                    session.close()
+                except Exception:  # noqa: BLE001
+                    pass
+            if resp.status_code != 200:
+                return
+            detail = _parse_item_detail(resp.text or "")
+            if detail["description"]:
+                raw.description = detail["description"]
+            if detail["posted_at"] is not None:
+                raw.posted_at = detail["posted_at"]
+            if not raw.location_city and detail["location_city"]:
+                raw.location_city = detail["location_city"]
+        except Exception as exc:  # noqa: BLE001 — enrichment must never break a poll
+            logger.debug("Facebook enrich failed for item %s: %s", raw.source_id, exc)
 
     # -- anonymous GraphQL path (no account) ---------------------------------
     def _search_anonymous(self, query: SearchQuery) -> list[RawListing]:
@@ -364,6 +412,38 @@ def _apply_price_filter(listings: list[RawListing], query: SearchQuery) -> list[
                 continue
         out.append(raw)
     return out
+
+
+def _parse_item_detail(html: str) -> dict:
+    """Pull description, posted date and location from an item page's JSON.
+
+    Anchors on the viewed listing's ``redacted_description`` (unique to it on the
+    page); ``creation_time`` and ``location_text`` follow it. All best-effort —
+    missing fields come back empty rather than raising.
+    """
+    out: dict = {"description": "", "posted_at": None, "location_city": None}
+    m = _DESC_RE.search(html)
+    if not m:
+        return out
+    out["description"] = _json_unescape(m.group(1))
+    tail = html[m.end() : m.end() + 800]
+    t = _CTIME_RE.search(tail)
+    if t:
+        out["posted_at"] = datetime.fromtimestamp(int(t.group(1)), tz=timezone.utc).replace(
+            tzinfo=None
+        )
+    loc = _LOC_TEXT_RE.search(tail)
+    if loc:
+        city = _json_unescape(loc.group(1)).split(",")[0].strip()
+        out["location_city"] = city or None
+    return out
+
+
+def _json_unescape(s: str) -> str:
+    try:
+        return json.loads(f'"{s}"')
+    except json.JSONDecodeError:
+        return s
 
 
 def _currency_from_formatted(formatted: str | None) -> str:
