@@ -1,0 +1,26 @@
+{# Shared UI macros. #}
+
+{# Price-change badge: a small graph arrow shown next to a price when the last
+   two price_history points differ. Drop = green down-arrow, rise = red up-arrow
+   (distinct glyphs, not a flipped one). Renders nothing when there's no change. #}
+{% macro price_change_badge(price, currency, history) -%}
+  {%- set _prev = history[-2].price if history and history|length >= 2 else none -%}
+  {%- set _dropped = _prev is not none and price is not none and price < _prev -%}
+  {%- set _rose = _prev is not none and price is not none and price > _prev -%}
+  {%- if _dropped or _rose -%}
+  <span class="shrink-0 {% if _dropped %}text-emerald-600{% else %}text-red-500{% endif %}"
+        title="Ancien prix&nbsp;: {{ '%.0f'|format(_prev) }}&nbsp;{{ currency }}">
+    {%- if _dropped -%}
+    <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4" aria-hidden="true">
+      <title>Baisse de prix</title>
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M2.29289 6.3006C2.68341 5.8998 3.31658 5.8998 3.7071 6.3006L8.53842 11.2591L11.5076 8.21177C11.8239 7.89353 12.2493 7.71532 12.6922 7.71532C13.1352 7.71532 13.5605 7.89357 13.8769 8.21181L13.884 8.21898L20 14.496V11.2895C20 10.7226 20.4477 10.2631 21 10.2631C21.5523 10.2631 22 10.7226 22 11.2895V16.9737C22 17.5405 21.5523 18 21 18H15.4616C14.9093 18 14.4616 17.5405 14.4616 16.9737C14.4616 16.4069 14.9093 15.9474 15.4616 15.9474H18.5858L12.6922 9.89881L9.72307 12.9461C9.40673 13.2644 8.98139 13.4426 8.53842 13.4426C8.09546 13.4426 7.67016 13.2643 7.35382 12.9461L7.34667 12.9389L2.29289 7.75204C1.90237 7.35123 1.90237 6.7014 2.29289 6.3006Z"></path>
+    </svg>
+    {%- else -%}
+    <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4" aria-hidden="true">
+      <title>Hausse de prix</title>
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M2.29289 13.6994C2.68341 14.1002 3.31658 14.1002 3.7071 13.6994L8.53842 8.74088L11.5076 11.7882C11.8239 12.1065 12.2493 12.2847 12.6922 12.2847C13.1352 12.2847 13.5605 12.1064 13.8769 11.7882L13.884 11.781L20 5.50402V8.71046C20 9.27735 20.4477 9.73686 21 9.73686C21.5523 9.73686 22 9.27735 22 8.71046V3.02631C22 2.45943 21.5523 2 21 2H15.4616C14.9093 2 14.4616 2.45951 14.4616 3.02631C14.4616 3.5931 14.9093 4.05262 15.4616 4.05262H18.5858L12.6922 10.1012L9.72307 7.05389C9.40673 6.73557 8.98139 6.55737 8.53842 6.55737C8.09546 6.55737 7.67016 6.73565 7.35382 7.05389L7.34667 7.06106L2.29289 12.248C1.90237 12.6488 1.90237 13.2986 2.29289 13.6994Z"></path>
+    </svg>
+    {%- endif -%}
+  </span>
+  {%- endif -%}
+{%- endmacro %}
