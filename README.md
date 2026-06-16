@@ -1,4 +1,13 @@
-# 🎮 Switch Parts Tracker
+<div align="center">
+
+<img src="app/web/static/favicon.svg" alt="Enklask" width="84" height="84" />
+
+# Enklask
+
+***Enklask*** — Breton for **“investigation / inquiry.”**
+A fitting name for a tool that quietly investigates the marketplaces and reports what it digs up.
+
+</div>
 
 A self-hosted tracker that watches second-hand marketplaces for **Nintendo Switch
 parts** — job lots, "for parts" consoles, motherboards, chassis, screens — across
