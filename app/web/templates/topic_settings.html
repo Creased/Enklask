@@ -24,11 +24,11 @@
                  class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
         </label>
         <label class="flex flex-col gap-1.5">
-          <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">URL Apprise (optionnel)</span>
+          <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Webhook Discord (optionnel)</span>
           <input type="text" name="apprise_urls" value="{{ topic.apprise_urls }}"
-                 placeholder="http://... (vide = utilise le global)"
+                 placeholder="discord://… (vide = webhook global)"
                  class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
-          <p class="text-xs text-gray-400">Si vide, les notifications utilisent l'URL globale des paramètres.</p>
+          <p class="text-xs text-gray-400">Si vide, les notifications utilisent le webhook global des paramètres.</p>
         </label>
         <button type="submit"
                 class="w-full bg-brand hover:bg-brand-dark text-white font-semibold py-2.5 rounded-xl transition-colors text-sm">

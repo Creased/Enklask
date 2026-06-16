@@ -169,13 +169,14 @@
       </div>
       <div class="p-5 space-y-4">
         <label class="flex flex-col gap-1.5">
-          <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">URL Apprise</span>
+          <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Webhook Discord</span>
           <input type="text" name="apprise_urls" value="{{ settings.apprise_urls }}"
-                 placeholder="http://apprise:8001/notify/switch"
+                 placeholder="discord://ID_WEBHOOK/TOKEN_WEBHOOK"
                  class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
         </label>
         <p class="text-xs text-gray-400">
-          URL utilisée par défaut. Chaque topic peut définir sa propre URL dans ses paramètres.
+          Webhook Discord par défaut — <code>discord://ID/TOKEN</code> ou l'URL https du webhook.
+          Chaque topic peut définir le sien dans ses paramètres.
         </p>
 
         <div class="flex flex-col sm:flex-row sm:items-center gap-4">
