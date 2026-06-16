@@ -31,7 +31,7 @@ location and searches are configurable.
 |---------------------|--------------------------------|---------------------------------|
 | eBay                | Official Browse API            | ✅ Stable                       |
 | Vinted              | Unofficial internal JSON API   | ✅ Works (may break on changes) |
-| Leboncoin           | API + Playwright fallback      | ⚠️ Best effort (DataDome)       |
+| Leboncoin           | Unofficial API (browser-TLS)   | ✅ Works (no key)               |
 | Rakuten France      | Public search (JSON-LD)        | ⚠️ Best effort                  |
 | Geev                | Unofficial internal API        | ⚠️ Best effort (free donor units)|
 | Facebook Marketplace| Headless browser (logged-in)   | 🧪 Experimental (opt-in)        |
