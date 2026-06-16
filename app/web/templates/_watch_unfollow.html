@@ -1,0 +1,6 @@
+{# Response to unfollowing a row on /liked. The heart button targets
+   #watch-{id} with outerHTML, so the (non-OOB) empty body removes that row;
+   the two OOB blocks refresh the header count and the summary tiles so the
+   numbers don't go stale. #}
+<span id="watch-count" class="text-sm text-gray-400 shrink-0" hx-swap-oob="true">{{ summary.count }} suivi{{ "s" if summary.count != 1 else "" }}</span>
+<div id="watch-summary" hx-swap-oob="true">{% include "_watch_summary.html" %}</div>

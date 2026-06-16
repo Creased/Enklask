@@ -40,9 +40,9 @@
       {% if row.cur is not none %}{{ "%.0f"|format(row.cur) }}&nbsp;{{ listing.currency }}{% else %}&mdash;{% endif %}
     </div>
     {% if row.delta < 0 %}
-    <span class="inline-block mt-0.5 rounded-full px-2 py-0.5 text-xs font-semibold bg-emerald-50 text-emerald-700">&minus;{{ "%.0f"|format(-row.delta) }}&nbsp;€ &middot; &minus;{{ "%.0f"|format(-row.pct) }}&nbsp;%</span>
+    <span class="inline-block mt-0.5 rounded-full px-2 py-0.5 text-xs font-semibold bg-emerald-50 text-emerald-700">&minus;{{ "%.0f"|format(-row.delta) }}&nbsp;€{% if row.pct is not none %}<span class="hidden sm:inline"> &middot; &minus;{{ "%.0f"|format(-row.pct) }}&nbsp;%</span>{% endif %}</span>
     {% elif row.delta > 0 %}
-    <span class="inline-block mt-0.5 rounded-full px-2 py-0.5 text-xs font-semibold bg-red-50 text-red-600">+{{ "%.0f"|format(row.delta) }}&nbsp;€ &middot; +{{ "%.0f"|format(row.pct) }}&nbsp;%</span>
+    <span class="inline-block mt-0.5 rounded-full px-2 py-0.5 text-xs font-semibold bg-red-50 text-red-600">+{{ "%.0f"|format(row.delta) }}&nbsp;€{% if row.pct is not none %}<span class="hidden sm:inline"> &middot; +{{ "%.0f"|format(row.pct) }}&nbsp;%</span>{% endif %}</span>
     {% else %}
     <span class="inline-block mt-0.5 rounded-full px-2 py-0.5 text-xs font-semibold bg-warm-100 text-gray-400">Stable</span>
     {% endif %}

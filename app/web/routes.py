@@ -638,7 +638,12 @@ def update_status(
     # -liked listing re-renders its row (safety — a toggle won't hit this).
     if from_ == "liked":
         if listing.status != ListingStatus.LIKED.value:
-            return HTMLResponse("")
+            # Unfollowed: remove the row + refresh the (out-of-band) summary so
+            # the header count / tiles don't go stale.
+            _, summary, _ = _watch_rows(session, None)
+            return templates.TemplateResponse(
+                "_watch_unfollow.html", {"request": request, "summary": summary}
+            )
         return templates.TemplateResponse(
             "_watch_row.html", {"request": request, "row": _watch_row(listing)}
         )
@@ -744,7 +749,8 @@ def _watch_row(listing: Listing) -> dict:
     cur = listing.price if listing.price is not None else (pts[-1] if pts else None)
     first = pts[0] if pts else cur
     delta = (cur - first) if (cur is not None and first is not None) else 0.0
-    pct = (100.0 * delta / first) if first else 0.0
+    # None (not 0%) when the base price is 0/None — avoids a misleading "+N € · +0 %".
+    pct = (100.0 * delta / first) if first else None
     lo, hi = (min(pts), max(pts)) if pts else (cur, cur)
     moved = len(pts) >= 2
     points = last_x = last_y = None

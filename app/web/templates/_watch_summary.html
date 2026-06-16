@@ -1,0 +1,16 @@
+{% if summary.count %}
+<div class="grid grid-cols-3 gap-2 mb-4">
+  <div class="bg-white rounded-2xl border border-warm-200 p-3 text-center">
+    <div class="text-xl font-bold text-gray-900">{{ summary.count }}</div>
+    <div class="text-xs text-gray-400">Suivis</div>
+  </div>
+  <div class="bg-white rounded-2xl border border-warm-200 p-3 text-center">
+    <div class="text-xl font-bold {{ 'text-emerald-600' if summary.dropped else 'text-gray-300' }}">{{ summary.dropped }}</div>
+    <div class="text-xs text-gray-400">En baisse</div>
+  </div>
+  <div class="bg-white rounded-2xl border border-warm-200 p-3 text-center" title="Cumul des baisses depuis le début du suivi (pas un prix de marché)">
+    <div class="text-xl font-bold {{ 'text-emerald-600' if summary.savings else 'text-gray-300' }}">{{ "%.0f"|format(summary.savings) }}&nbsp;€</div>
+    <div class="text-xs text-gray-400">Éco. depuis le suivi</div>
+  </div>
+</div>
+{% endif %}
