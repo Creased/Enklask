@@ -1,7 +1,7 @@
 name: Build & publish Docker image
 
-# Builds the ad-tracker image and pushes it to the GitHub Container Registry
-# (GHCR). The Synology pulls ghcr.io/creased/ad-tracker:latest.
+# Builds the Enklask image and pushes it to the GitHub Container Registry
+# (GHCR). The Synology pulls ghcr.io/creased/enklask:latest.
 #
 # Auth uses the built-in GITHUB_TOKEN — no secrets to configure. The package
 # stays private; the Synology pulls it after a one-time `docker login ghcr.io`
@@ -23,7 +23,7 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }} # Creased/ad-tracker (lowercased by metadata-action)
+  IMAGE_NAME: ${{ github.repository }} # Creased/Enklask -> ghcr.io/creased/enklask (lowercased)
 
 jobs:
   build:
