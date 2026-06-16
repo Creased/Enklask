@@ -26,7 +26,6 @@ class NotifyItem:
     currency: str = "EUR"
     location_city: str | None = None
     distance_km: float | None = None
-    thumbnail: str | None = None
 
     @classmethod
     def from_listing(cls, listing, topic_name: str = "") -> "NotifyItem":
@@ -39,7 +38,6 @@ class NotifyItem:
             currency=listing.currency,
             location_city=listing.location_city,
             distance_km=listing.distance_km,
-            thumbnail=listing.thumbnail,
         )
 
 
@@ -107,8 +105,9 @@ class Notifier:
         sent = 0
         for item in items:
             title, body = self.format_listing(item)
-            attach = [item.thumbnail] if item.thumbnail else None
-            if self._send(title, body, attach):
+            # No image attachment: the listing URL in the body already yields a
+            # link preview (with the photo) on Telegram/Discord/etc.
+            if self._send(title, body):
                 sent += 1
         return sent
 
@@ -131,7 +130,7 @@ class Notifier:
             lines.append(f"… et {len(items) - len(shown)} de plus")
         return title, "\n".join(lines)
 
-    def _send(self, title: str, body: str, attach: list[str] | None = None) -> bool:
+    def _send(self, title: str, body: str) -> bool:
         try:
             import apprise
         except ImportError:
@@ -141,7 +140,7 @@ class Notifier:
             ap = apprise.Apprise()
             for url in self._urls:
                 ap.add(url)
-            return bool(ap.notify(title=title, body=body, attach=attach or None))
+            return bool(ap.notify(title=title, body=body))
         except (KeyboardInterrupt, SystemExit):
             raise
         except BaseException:

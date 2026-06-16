@@ -13,7 +13,6 @@ def _item(i: int = 0, **kw) -> NotifyItem:
         location_city="Rennes",
         distance_km=3.0,
         topic_name="Nintendo Switch",
-        thumbnail="https://img/thumb.jpg",
     )
     base.update(kw)
     return NotifyItem(**base)
@@ -48,7 +47,8 @@ def test_individual_sends_below_cap():
         sent = n.notify_new(items)
     assert sent == 3
     assert send.call_count == 3
-    assert send.call_args.args[2] == ["https://img/thumb.jpg"]
+    # Only (title, body) — no image attachment (the link preview shows the photo).
+    assert len(send.call_args.args) == 2
 
 
 def test_digest_above_cap():
