@@ -24,3 +24,22 @@
   </span>
   {%- endif -%}
 {%- endmacro %}
+
+
+{# Inline price sparkline for the watch list. `points` is a precomputed polyline
+   string (see _sparkline_points); colored by trend. When the price hasn't moved
+   yet (only one data point), draws a faint flat baseline so rows stay uniform. #}
+{% macro sparkline(points, last_x, last_y, direction, moved) -%}
+  {%- set _color = 'text-emerald-600' if direction == 'down' else ('text-red-500' if direction == 'up' else 'text-gray-300') -%}
+  <span class="inline-block {{ _color }}">
+    <svg viewBox="0 0 120 32" class="w-28 h-8" preserveAspectRatio="none" aria-hidden="true">
+      {%- if moved and points -%}
+      <polyline fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke"
+                stroke-linecap="round" stroke-linejoin="round" points="{{ points }}"></polyline>
+      <circle cx="{{ '%.1f'|format(last_x) }}" cy="{{ '%.1f'|format(last_y) }}" r="1.8" fill="currentColor"></circle>
+      {%- else -%}
+      <line x1="3" y1="16" x2="117" y2="16" stroke="currentColor" stroke-width="1" class="text-warm-200"></line>
+      {%- endif -%}
+    </svg>
+  </span>
+{%- endmacro %}

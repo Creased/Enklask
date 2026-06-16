@@ -1,0 +1,19 @@
+{% if rows %}
+  {% if not summary.any_moved %}
+  <p class="text-xs text-gray-400 px-1 pb-1">Les prix n'ont pas encore bougé&nbsp;— on affichera les variations dès qu'elles arrivent.</p>
+  {% endif %}
+  {% for row in rows %}
+    {% include "_watch_row.html" %}
+  {% endfor %}
+{% else %}
+<div class="text-center py-20">
+  <div class="w-16 h-16 rounded-full bg-warm-100 flex items-center justify-center mx-auto mb-4 text-gray-300">
+    <svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.2">
+      <path d="M8 13.7l-1.1-1C3.6 9.8 1.5 7.9 1.5 5.6 1.5 3.7 3 2.2 4.9 2.2c1 0 2 .5 2.6 1.3.7-.8 1.6-1.3 2.6-1.3 1.9 0 3.4 1.5 3.4 3.4 0 2.3-2.1 4.2-5.4 7.1L8 13.7z"/>
+    </svg>
+  </div>
+  <p class="text-gray-400 text-sm mb-1">Aucun article suivi</p>
+  <p class="text-gray-300 text-xs mb-4">Aime une annonce (le cœur) pour suivre l'évolution de son prix ici.</p>
+  <a href="/" class="inline-block text-sm font-semibold text-brand bg-brand-light rounded-xl px-4 py-2 hover:bg-brand/10 transition-colors">Parcourir les annonces</a>
+</div>
+{% endif %}

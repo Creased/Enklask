@@ -92,6 +92,15 @@ SORT_LABELS = {
     "price_desc": "Prix décroissants",
 }
 
+# Sort options for the liked price-watch page (computed in Python — the delta
+# lives in the price_history JSON and can't be ordered in SQL).
+LIKED_SORT_LABELS = {
+    "price_drop": "Plus grosse baisse",
+    "recent_move": "Mouvement récent",
+    "price_rise": "Plus grosse hausse",
+    "price_desc": "Prix décroissants",
+}
+
 
 def _filter_context() -> dict:
     return {
@@ -606,6 +615,7 @@ def update_status(
     listing_id: int,
     request: Request,
     value: str = Form(...),
+    from_: str = Form("", alias="from"),
     session: Session = Depends(get_session),
 ):
     try:
@@ -623,6 +633,15 @@ def update_status(
         listing.status = new_status.value
     session.commit()
     session.refresh(listing)
+
+    # On the price-watch page, unfollowing removes the row (empty swap); a still
+    # -liked listing re-renders its row (safety — a toggle won't hit this).
+    if from_ == "liked":
+        if listing.status != ListingStatus.LIKED.value:
+            return HTMLResponse("")
+        return templates.TemplateResponse(
+            "_watch_row.html", {"request": request, "row": _watch_row(listing)}
+        )
 
     if listing.status == ListingStatus.HIDDEN.value:
         return HTMLResponse("")
@@ -691,6 +710,98 @@ def refresh_search(
             "request": request, "search": search, "topic": topic,
             "count": count, "condition_labels": CONDITION_LABELS,
         },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Liked items — price watch
+# ---------------------------------------------------------------------------
+
+
+def _sparkline_points(pts: list[float]) -> tuple[str, float, float]:
+    """Build an SVG polyline (in a 120x32 box) from price points; higher price
+    sits higher. Returns (points string, last x, last y). Caller guarantees ≥2 pts."""
+    W, H, pad = 120, 32, 3
+    lo, hi = min(pts), max(pts)
+    span = (hi - lo) or 1.0
+    n = len(pts)
+    coords, x, y = [], 0.0, 0.0
+    for i, p in enumerate(pts):
+        x = pad + i * (W - 2 * pad) / (n - 1)
+        y = (H - pad) - (p - lo) / span * (H - 2 * pad)
+        coords.append(f"{x:.1f},{y:.1f}")
+    return " ".join(coords), x, y
+
+
+def _watch_row(listing: Listing) -> dict:
+    """A price-tracking view over a liked listing: current/first price, delta
+    since first seen, min/max, and a precomputed sparkline."""
+    history = listing.price_history or []
+    pts = [
+        e["price"] for e in history
+        if isinstance(e, dict) and e.get("price") is not None
+    ]
+    cur = listing.price if listing.price is not None else (pts[-1] if pts else None)
+    first = pts[0] if pts else cur
+    delta = (cur - first) if (cur is not None and first is not None) else 0.0
+    pct = (100.0 * delta / first) if first else 0.0
+    lo, hi = (min(pts), max(pts)) if pts else (cur, cur)
+    moved = len(pts) >= 2
+    points = last_x = last_y = None
+    if moved:
+        points, last_x, last_y = _sparkline_points(pts)
+    direction = "down" if delta < 0 else ("up" if delta > 0 else "flat")
+    return {
+        "listing": listing, "cur": cur, "first": first, "delta": delta, "pct": pct,
+        "lo": lo, "hi": hi, "moved": moved, "direction": direction,
+        "points": points, "last_x": last_x, "last_y": last_y,
+    }
+
+
+def _last_move_at(listing: Listing) -> str:
+    """ISO timestamp of the most recent price_history entry (sorts chronologically
+    as a string since all entries are UTC isoformat)."""
+    history = listing.price_history or []
+    return history[-1].get("at", "") if history and isinstance(history[-1], dict) else ""
+
+
+def _watch_rows(session: Session, sort: str | None) -> tuple[list[dict], dict, str]:
+    listings = _query_listings(
+        session, status=ListingStatus.LIKED.value, limit=500, offset=0
+    )
+    rows = [_watch_row(li) for li in listings]
+    sort = sort if sort in LIKED_SORT_LABELS else "price_drop"
+    if sort == "price_drop":
+        rows.sort(key=lambda r: (r["delta"] >= 0, r["delta"]))
+    elif sort == "price_rise":
+        rows.sort(key=lambda r: r["delta"], reverse=True)
+    elif sort == "recent_move":
+        rows.sort(key=lambda r: _last_move_at(r["listing"]), reverse=True)
+    elif sort == "price_desc":
+        rows.sort(key=lambda r: (r["cur"] is None, -(r["cur"] or 0.0)))
+    summary = {
+        "count": len(rows),
+        "dropped": sum(1 for r in rows if r["delta"] < 0),
+        "savings": sum(-r["delta"] for r in rows if r["delta"] < 0),
+        "any_moved": any(r["moved"] for r in rows),
+    }
+    return rows, summary, sort
+
+
+@router.get("/liked", response_class=HTMLResponse)
+def liked_page(request: Request, session: Session = Depends(get_session)):
+    rows, summary, sort = _watch_rows(session, request.query_params.get("sort"))
+    return templates.TemplateResponse("liked.html", {
+        "request": request, "rows": rows, "summary": summary,
+        "selected_sort": sort, "sort_labels": LIKED_SORT_LABELS,
+    })
+
+
+@router.get("/partials/liked", response_class=HTMLResponse)
+def liked_partial(request: Request, session: Session = Depends(get_session)):
+    rows, summary, _ = _watch_rows(session, request.query_params.get("sort"))
+    return templates.TemplateResponse(
+        "_watch_items.html", {"request": request, "rows": rows, "summary": summary}
     )
 
 
