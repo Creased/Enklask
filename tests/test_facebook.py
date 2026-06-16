@@ -1,6 +1,6 @@
 from app.enums import Source
 from app.sources.base import SearchQuery
-from app.sources.facebook import FacebookSource, _apply_price_filter
+from app.sources.facebook import FacebookSource, _apply_price_filter, _build_search_url
 
 # --- Logged-in Playwright fallback parser (legacy card scraping) -----------
 
@@ -99,6 +99,20 @@ def test_facebook_currency_from_formatted_amount():
     payload = _payload(_node("9", "US item", "50.00", formatted="$50"))
     raw = FacebookSource()._parse_feed(payload)[0]
     assert raw.currency == "USD"
+
+
+def test_facebook_condition_for_parts_maps_to_used_fair():
+    # FB has no "for parts" condition; the closest is used_fair.
+    url = _build_search_url(SearchQuery("switch", condition="for_parts"))
+    assert "itemCondition=used_fair" in url
+    assert "query=switch" in url
+
+
+def test_facebook_condition_omitted_when_unset_or_unknown():
+    assert "itemCondition" not in _build_search_url(SearchQuery("switch"))
+    assert "itemCondition" not in _build_search_url(
+        SearchQuery("switch", condition="whatever")
+    )
 
 
 def test_facebook_price_filter_uses_decimal_amount():

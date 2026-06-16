@@ -52,14 +52,31 @@ _PRELOADER_RE = re.compile(
 _ITEM_ID_RE = re.compile(r"/marketplace/item/(\d+)")
 _PRICE_RE = re.compile(r"(\d[\d\s.,]*)\s*€")
 
-# Generic condition bucket -> FB Marketplace condition code. FB has no
-# "for parts" equivalent, so it's left unfiltered.
+# Generic condition bucket -> FB Marketplace itemCondition code. FB has no
+# "for parts" condition, so map it to the closest (used_fair). FB's valid set:
+# new, used_like_new, used_good, used_fair.
 _CONDITION = {
     "new": "new",
     "like_new": "used_like_new",
     "good": "used_good",
     "fair": "used_fair",
+    "for_parts": "used_fair",
 }
+
+
+def _build_search_url(query: SearchQuery) -> str:
+    """Public Marketplace search URL. FB encodes these query params into its own
+    GraphQL variables (which we harvest and reuse), so the condition format stays
+    correct without us hardcoding the GraphQL field shape."""
+    parts = [
+        f"query={quote(query.query)}",
+        "sortBy=creation_time_descend",
+        "exact=false",
+    ]
+    code = _CONDITION.get(query.condition or "")
+    if code:
+        parts.append(f"itemCondition={code}")
+    return "https://www.facebook.com/marketplace/search/?" + "&".join(parts)
 
 
 class FacebookBlocked(RuntimeError):
@@ -106,7 +123,7 @@ class FacebookSource(BaseSource):
             "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
         })
         try:
-            lsd, doc_id, variables = self._harvest(session, query.query)
+            lsd, doc_id, variables = self._harvest(session, query)
             self._apply_query(variables, query)
             payload = self._post_graphql(session, lsd, doc_id, variables)
         finally:
@@ -118,12 +135,9 @@ class FacebookSource(BaseSource):
         listings = self._parse_feed(payload)
         return _apply_price_filter(listings, query)
 
-    def _harvest(self, session, text: str) -> tuple[str, str, dict]:
+    def _harvest(self, session, query: SearchQuery) -> tuple[str, str, dict]:
         """GET the search page and pull lsd, doc_id and FB's variables blob."""
-        url = (
-            "https://www.facebook.com/marketplace/search/"
-            f"?query={quote(text)}&sortBy=creation_time_descend&exact=false"
-        )
+        url = _build_search_url(query)
         resp = session.get(
             url,
             headers={"Accept": "text/html,application/xhtml+xml,*/*;q=0.8"},
@@ -200,8 +214,8 @@ class FacebookSource(BaseSource):
         brp["filter_location_latitude"] = s.home_lat
         brp["filter_location_longitude"] = s.home_lon
         brp["filter_radius_km"] = radius
-        if query.condition and query.condition in _CONDITION:
-            brp["commerce_search_and_rp_condition"] = [_CONDITION[query.condition]]
+        # Condition is already encoded by FB (as a comma-separated string) from
+        # the itemCondition= URL param during harvest — don't clobber it here.
 
     # -- pure feed parsing (unit-tested) -------------------------------------
     def _parse_feed(self, payload: dict) -> list[RawListing]:
