@@ -5,7 +5,7 @@ name: Build & publish Docker image
 #
 # Auth uses the built-in GITHUB_TOKEN — no secrets to configure. The package
 # stays private; the Synology pulls it after a one-time `docker login ghcr.io`
-# with a PAT that has `read:packages` (see deploy/synology/docker-compose.yml).
+# with a PAT that has `read:packages`.
 
 on:
   push:

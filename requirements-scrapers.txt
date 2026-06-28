@@ -1,5 +1,0 @@
-# Optional, heavier dependency for the standalone Leboncoin crawler only
-# (scripts/lbc_crawl.py harvests a DataDome cookie via a real browser).
-# The app itself needs none of this. Install with:
-#   pip install -r requirements-scrapers.txt && playwright install chromium
-playwright==1.49.1

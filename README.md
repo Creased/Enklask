@@ -107,8 +107,6 @@ docker compose up -d --build
 ```
 
 Works on a Raspberry Pi / small box — every source crawls over plain HTTP (no browser).
-Only the optional standalone Leboncoin crawler (`scripts/lbc_crawl.py`) needs Playwright;
-see `requirements-scrapers.txt`. The app itself never does.
 
 ## Configuration
 
@@ -169,11 +167,10 @@ Covers the taxonomy classifier, dedup/upsert logic, and the eBay response parser
 
 - **Vinted** — set `ENABLE_VINTED=true`. No credentials; cookies are bootstrapped
   automatically. If it stops returning results, Vinted likely changed its internal API.
-- **Leboncoin** — set `ENABLE_LEBONCOIN=true`. Tries the JSON API first; if DataDome
-  blocks it and the scraper deps are installed (`requirements-scrapers.txt` +
-  `playwright install chromium`), it automatically falls back to a headless browser that
-  reads ads from the page's embedded `__NEXT_DATA__`. If both are blocked, it reports an
-  error and the other sources keep working.
+- **Leboncoin** — set `ENABLE_LEBONCOIN=true`. Uses `curl_cffi` to impersonate a browser's
+  TLS fingerprint and self-mint a DataDome cookie, then queries the JSON search API — no
+  browser. Needs a reasonably trusted (French residential) egress IP; from a blocked IP it
+  reports an error and the other sources keep working.
 - **Rakuten France** — set `ENABLE_RAKUTEN=true`. Reads the public search page's standard
   JSON-LD product data (Rakuten's *official* API excludes used/C2C deals, which are exactly
   what we want). No credentials needed.

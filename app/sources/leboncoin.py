@@ -9,8 +9,7 @@ On a 403 the identity (UA + TLS profile + cookie) is rotated and retried.
 
 The only requirement is a reasonably trusted (French residential) egress IP. If
 ``curl_cffi`` is unavailable, it falls back to an httpx POST seeded with a
-``datadome`` cookie from cookies.txt. See LEBONCOIN_DATADOME.md for the full
-reverse-engineering notes.
+``datadome`` cookie from cookies.txt.
 """
 
 from __future__ import annotations
