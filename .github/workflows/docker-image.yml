@@ -1,10 +1,10 @@
 name: Build & publish Docker image
 
 # Builds the Enklask image and pushes it to the GitHub Container Registry
-# (GHCR). The Synology pulls ghcr.io/creased/enklask:latest.
+# (GHCR). The deployment host pulls ghcr.io/creased/enklask:latest.
 #
 # Auth uses the built-in GITHUB_TOKEN — no secrets to configure. The package
-# stays private; the Synology pulls it after a one-time `docker login ghcr.io`
+# stays private; the host pulls it after a one-time `docker login ghcr.io`
 # with a PAT that has `read:packages`.
 
 on:
