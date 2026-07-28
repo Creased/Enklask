@@ -831,7 +831,6 @@ async def settings_save(request: Request):
 
     bool_fields = [
         "enable_ebay", "enable_vinted", "enable_leboncoin",
-        "enable_facebook",
         "notify_on_first_run",
     ]
     int_fields = ["poll_interval_minutes", "notify_max_per_poll"]

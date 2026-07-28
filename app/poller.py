@@ -13,7 +13,7 @@ from .db import session_scope
 from .dedup import upsert_listing
 from .models import Listing, ListingTopic, SavedSearch, Topic
 from .notifier import Notifier, NotifyItem
-from .sources.base import BaseSource, SearchQuery
+from .sources.base import SearchQuery
 from .sources.registry import get_enabled_sources
 
 logger = logging.getLogger(__name__)
@@ -173,8 +173,6 @@ def _poll_one(topic, search, sources) -> tuple[int, int, dict, list]:
             errors[source.name.value] = str(exc)
             continue
 
-        _enrich_new(source, raws)
-
         with session_scope() as session:
             for raw in raws:
                 listing = upsert_listing(
@@ -195,34 +193,6 @@ def _poll_one(topic, search, sources) -> tuple[int, int, dict, list]:
         time.sleep(random.uniform(0.5, 1.5))
 
     return new_count, seen_count, errors, new_items
-
-
-def _enrich_new(source, raws) -> None:
-    """Enrich only listings we haven't stored yet (e.g. fetch a Facebook ad's
-    description + date). Done before the write transaction so the per-item HTTP
-    never holds a SQLite write lock; the existence check is a short read.
-    """
-    if type(source).enrich is BaseSource.enrich:
-        return  # source doesn't enrich — skip the lookup entirely
-    ids = [r.source_id for r in raws if r.source_id]
-    if not ids:
-        return
-    try:
-        with session_scope() as session:
-            known = set(
-                session.scalars(
-                    select(Listing.source_id).where(
-                        Listing.source == source.name.value,
-                        Listing.source_id.in_(ids),
-                    )
-                )
-            )
-    except Exception:
-        logger.exception("Enrich pre-check failed for %s", source.name.value)
-        return
-    for raw in raws:
-        if raw.source_id and raw.source_id not in known:
-            source.enrich(raw)
 
 
 def _notify(topic, new_items: list[NotifyItem], is_cold_start: bool) -> None:

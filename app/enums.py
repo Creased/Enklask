@@ -9,7 +9,6 @@ class Source(str, Enum):
     EBAY = "ebay"
     VINTED = "vinted"
     LEBONCOIN = "leboncoin"
-    FACEBOOK = "facebook"
 
 
 class ListingStatus(str, Enum):

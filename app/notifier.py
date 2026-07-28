@@ -30,7 +30,6 @@ _SOURCE_COLOR = {
     "ebay": 0x0064D2,
     "vinted": 0x09B1BA,
     "leboncoin": 0xFF6E14,
-    "facebook": 0x4267B2,
 }
 _DEFAULT_COLOR = 0xE63946  # brand red
 

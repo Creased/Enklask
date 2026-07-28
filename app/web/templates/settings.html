@@ -115,16 +115,6 @@
           </div>
         </div>
 
-        <!-- Facebook -->
-        <div class="px-5 py-4">
-          <label class="flex items-center justify-between cursor-pointer">
-            <span class="text-sm font-semibold text-indigo-600">Facebook</span>
-            <input type="checkbox" name="enable_facebook" {% if settings.enable_facebook %}checked{% endif %} class="sr-only peer" />
-            <div class="toggle-track peer"></div>
-          </label>
-          <p class="text-xs text-gray-400 mt-2">Aucun compte requis · localisation depuis les réglages généraux.</p>
-        </div>
-
         <input type="hidden" name="vinted_base_url" value="{{ settings.vinted_base_url }}" />
         <input type="hidden" name="leboncoin_base_url" value="{{ settings.leboncoin_base_url }}" />
       </div>

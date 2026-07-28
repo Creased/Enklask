@@ -1,8 +1,8 @@
 """Builds the list of active source adapters from configuration.
 
-Adapters are imported lazily so that an optional/heavy dependency (e.g.
-Playwright for Facebook) never breaks startup when that source is disabled,
-and so adapters added in later phases can be absent without errors.
+Adapters are imported lazily so that an optional/heavy dependency never breaks
+startup when that source is disabled, and so adapters added in later phases can
+be absent without errors.
 """
 
 from __future__ import annotations
@@ -33,17 +33,10 @@ def _leboncoin() -> BaseSource:
     return LeboncoinSource()
 
 
-def _facebook() -> BaseSource:
-    from .facebook import FacebookSource
-
-    return FacebookSource()
-
-
 _FACTORIES: tuple[Callable[[], BaseSource], ...] = (
     _ebay,
     _vinted,
     _leboncoin,
-    _facebook,
 )
 
 

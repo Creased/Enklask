@@ -33,7 +33,6 @@ class Settings(BaseModel):
     enable_ebay: bool = False
     enable_vinted: bool = False
     enable_leboncoin: bool = False
-    enable_facebook: bool = False
 
     # eBay Browse API (client-credentials OAuth)
     ebay_client_id: str = ""

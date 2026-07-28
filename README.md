@@ -11,7 +11,7 @@ A fitting name for a tool that quietly investigates the marketplaces and reports
 
 A self-hosted tracker that watches second-hand marketplaces for **whatever you're
 hunting**. Define searches grouped into topics and it aggregates the matching ads
-across **eBay, Vinted, Leboncoin and Facebook Marketplace** (France)
+across **eBay, Vinted and Leboncoin** (France)
 in a single dashboard — photos, price, price-drop history, location, and a one-click
 link to the original ad.
 
@@ -20,7 +20,7 @@ parts" consoles, motherboards, screens), but every search, topic and the home
 location is configurable — track anything: a console, a bike, a camera lens, a couch.
 
 > **Heads-up on data sources.** Only **eBay** offers an official API. The others
-> (Vinted, Leboncoin, Facebook Marketplace) have **no public API**, so
+> (Vinted, Leboncoin) have **no public API**, so
 > their adapters hit unofficial endpoints through a browser-TLS fingerprint
 > (`curl_cffi`) — no real browser. They can break when the sites change, and using them
 > may be against those sites' Terms of Service. Each source toggles independently, so
@@ -44,7 +44,6 @@ location is configurable — track anything: a console, a bike, a camera lens, a
 | eBay                | Official Browse API            | ✅ Stable                       |
 | Vinted              | Unofficial internal JSON API   | ✅ Works (may break on changes) |
 | Leboncoin           | Unofficial API (browser-TLS)   | ✅ Works (no key)               |
-| Facebook Marketplace| Public GraphQL (browser-TLS)    | ✅ Works (no account)           |
 
 ## Quick start (local)
 
@@ -97,7 +96,7 @@ docker compose down           # stop (data is kept)
 The SQLite database persists in `./data/ad_tracker.db`, so your ads survive restarts.
 
 **Turn on a real source** when ready: edit `.env` — e.g. add your eBay
-`EBAY_CLIENT_ID` / `EBAY_CLIENT_SECRET`, or set `ENABLE_VINTED=true` / `ENABLE_FACEBOOK=true` —
+`EBAY_CLIENT_ID` / `EBAY_CLIENT_SECRET`, or set `ENABLE_VINTED=true` / `ENABLE_LEBONCOIN=true` —
 then re-apply:
 
 ```bash
@@ -112,7 +111,7 @@ All settings live in `.env` (see `.env.example`). Highlights:
 
 - `POLL_INTERVAL_MINUTES` — how often to poll (default 10).
 - `HOME_LAT` / `HOME_LON` — your location for distance (default Rennes).
-- `ENABLE_EBAY` / `ENABLE_VINTED` / `ENABLE_LEBONCOIN` / `ENABLE_FACEBOOK` — per-source toggles.
+- `ENABLE_EBAY` / `ENABLE_VINTED` / `ENABLE_LEBONCOIN` — per-source toggles.
 
 Default saved searches (lot / pour pièces, carte mère, châssis, écran OLED, Lite HS) are
 seeded on first run.
@@ -168,12 +167,6 @@ Covers the taxonomy classifier, dedup/upsert logic, and the eBay response parser
   TLS fingerprint and self-mint a DataDome cookie, then queries the JSON search API — no
   browser. Needs a reasonably trusted (French residential) egress IP; from a blocked IP it
   reports an error and the other sources keep working.
-- **Facebook Marketplace** — set `ENABLE_FACEBOOK=true`. Works **logged out, no account**: it
-  harvests the `lsd` token + GraphQL `doc_id` from the public search page (browser-TLS via
-  `curl_cffi`) and replays the Marketplace search around `HOME_LAT`/`HOME_LON`. Most
-  ToS-sensitive source, and the `doc_id` rotates with FB deploys (re-harvested each search) —
-  use sparingly.
-
 ## Roadmap
 
 - Saved-search management UI in the dashboard.
