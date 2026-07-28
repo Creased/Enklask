@@ -39,6 +39,7 @@
       {{ ui.price_change_badge(listing.price, listing.currency, listing.price_history or []) }}
     </div>
     {% endif %}
+    {{ ui.ebay_meta(listing.shipping_cost, listing.buying_format, listing.currency) }}
 
     <a href="{{ listing.url }}" target="_blank" rel="noopener"
        class="text-sm text-gray-700 line-clamp-2 hover:text-brand transition-colors leading-snug">
@@ -91,6 +92,8 @@
     "title": listing.title,
     "price": (("%.0f"|format(listing.price)) ~ " " ~ listing.currency) if listing.price is not none else "",
     "currency": listing.currency,
+    "buyingFormat": ("Enchère" if listing.buying_format == 'auction' else ("Achat immédiat" if listing.buying_format == 'buy_it_now' else "")),
+    "shipping": (("Livraison gratuite" if listing.shipping_cost == 0 else ("+" ~ ("%.2f"|format(listing.shipping_cost)) ~ " " ~ listing.currency ~ " livraison")) if listing.shipping_cost is not none else ""),
     "priceHistory": listing.price_history or [],
     "source": listing.source,
     "id": listing.source_id,

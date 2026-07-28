@@ -30,6 +30,14 @@ def _ensure_listing_columns() -> None:
                 text("ALTER TABLE listings ADD COLUMN price_history TEXT DEFAULT '[]'")
             )
         logger.info("Added 'price_history' column to listings.")
+    if "shipping_cost" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE listings ADD COLUMN shipping_cost FLOAT"))
+        logger.info("Added 'shipping_cost' column to listings.")
+    if "buying_format" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE listings ADD COLUMN buying_format VARCHAR(16)"))
+        logger.info("Added 'buying_format' column to listings.")
 
 
 def _drop_topic_columns() -> None:

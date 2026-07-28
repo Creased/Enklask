@@ -104,6 +104,7 @@
       <div class="md:w-2/5 p-5 flex flex-col gap-2.5 overflow-y-auto">
         <span id="pv-source" class="self-start px-2 py-0.5 rounded-lg text-xs font-semibold"></span>
         <span id="pv-price" class="text-2xl font-bold text-gray-900"></span>
+        <div id="pv-ebay" class="hidden text-xs text-gray-500"></div>
         <div id="pv-history" class="hidden text-xs text-gray-400 items-center gap-1 flex-wrap"></div>
         <h2 id="pv-title" class="text-sm text-gray-700 leading-snug"></h2>
         <div id="pv-location" class="text-xs text-gray-400"></div>
@@ -146,6 +147,9 @@
       var price = document.getElementById('pv-price');
       price.textContent = d.price || '';
       price.classList.toggle('hidden', !d.price);
+
+      // eBay-only: auction/buy-it-now + shipping cost.
+      _pvField('pv-ebay', [d.buyingFormat, d.shipping].filter(Boolean).join(' · '));
 
       // Price trail: 60 € → 55 € → 50 € (last point emphasised).
       var hist = d.priceHistory || [];

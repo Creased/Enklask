@@ -54,6 +54,10 @@ def upsert_listing(
         # saved before date parsing existed).
         if existing.posted_at is None and raw.posted_at is not None:
             existing.posted_at = raw.posted_at
+        # Refresh shipping cost / buying format (they can change, and this
+        # backfills rows stored before these columns existed).
+        existing.shipping_cost = raw.shipping_cost
+        existing.buying_format = raw.buying_format
         # Link to topic if not already linked.
         if topic_id is not None:
             already_linked = session.scalar(
@@ -92,6 +96,8 @@ def upsert_listing(
         location_city=raw.location_city,
         distance_km=distance,
         shipping_options=raw.shipping_options,
+        shipping_cost=raw.shipping_cost,
+        buying_format=raw.buying_format,
         posted_at=raw.posted_at,
         price_history=(
             [{"price": raw.price, "at": _iso(None)}] if raw.price is not None else []

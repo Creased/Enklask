@@ -31,6 +31,9 @@ class RawListing:
     lon: float | None = None
     distance_km: float | None = None
     shipping_options: list[str] = field(default_factory=list)
+    # eBay-style extras (left None by sources that don't expose them).
+    shipping_cost: float | None = None   # delivery fee; 0.0 = free, None = unknown
+    buying_format: str | None = None     # "auction" | "buy_it_now"
     posted_at: datetime | None = None
 
 

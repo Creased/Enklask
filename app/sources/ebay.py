@@ -154,6 +154,19 @@ _PRICE_RE = re.compile(r's-card__price["\']?\s*>(.*?)</span>', re.IGNORECASE | r
 _PRICE_VALUE_RE = re.compile(r"([\d]+(?:[.,]\d+)?)")
 _TAG_RE = re.compile(r"<[^>]+>")
 
+# Shipping cost + buying format, read from the s-card attribute rows. eBay shows
+# these as e.g. "+$10.43 delivery" / "Free delivery" and "12 bids" / "Buy It Now"
+# (English on the .com fallback; "livraison"/"enchères" on ebay.fr).
+_EBAY_BIDS_RE = re.compile(r"\b(\d+)\s*(?:bids?|enchères?)\b", re.IGNORECASE)
+_EBAY_FREE_SHIP_RE = re.compile(
+    r"free\s+(?:delivery|shipping|postage)|livraison\s+gratuite", re.IGNORECASE
+)
+_EBAY_SHIP_COST_RE = re.compile(
+    r"\+\s*[€$£]?\s*(\d+(?:[.,]\d+)?)\s*(?:eur|usd|gbp|€|\$|£)?\s*"
+    r"(?:delivery|livraison|shipping|postage)",
+    re.IGNORECASE,
+)
+
 _SKIP_TITLES = {
     "shop on ebay", "annonce sponsorisée", "sponsored", "nouvelle annonce", "",
 }
@@ -310,6 +323,17 @@ class EbaySource(BaseSource):
         loc = item.get("itemLocation", {}) or {}
         posted_at = _parse_date(item.get("itemCreationDate"))
 
+        shipping_opts = item.get("shippingOptions") or []
+        shipping_cost = None
+        if shipping_opts:
+            cost = (shipping_opts[0] or {}).get("shippingCost") or {}
+            shipping_cost = _to_float(cost.get("value"))
+        buying_options = item.get("buyingOptions") or []
+        buying_format = (
+            "auction" if "AUCTION" in buying_options
+            else ("buy_it_now" if buying_options else None)
+        )
+
         return RawListing(
             source=Source.EBAY,
             source_id=str(item.get("itemId", "")),
@@ -320,6 +344,8 @@ class EbaySource(BaseSource):
             thumbnail=thumb,
             photos=photos,
             location_city=loc.get("city") or loc.get("country"),
+            shipping_cost=shipping_cost,
+            buying_format=buying_format,
             posted_at=posted_at,
         )
 
@@ -466,6 +492,7 @@ def _parse_search_html(html: str, tz=None) -> list[RawListing]:
 
         price, currency = _parse_html_price(card)
         thumb = _parse_thumbnail(card)
+        card_text = _strip_tags(card)
         results.append(
             RawListing(
                 source=Source.EBAY,
@@ -476,6 +503,8 @@ def _parse_search_html(html: str, tz=None) -> list[RawListing]:
                 currency=currency,
                 thumbnail=thumb,
                 photos=[thumb] if thumb else [],
+                shipping_cost=_parse_ebay_shipping(card_text),
+                buying_format=_ebay_buying_format(card_text),
                 posted_at=_parse_listing_date(card, tz),
             )
         )
@@ -513,6 +542,21 @@ def _parse_html_price(item_html: str) -> tuple[float | None, str]:
     return _to_float(price_str), currency
 
 
+def _parse_ebay_shipping(text: str) -> float | None:
+    """Delivery fee from a card's visible text: 0.0 = free, a number, or None."""
+    if _EBAY_FREE_SHIP_RE.search(text):
+        return 0.0
+    m = _EBAY_SHIP_COST_RE.search(text)
+    if m:
+        return _to_float(m.group(1).replace(",", "."))
+    return None
+
+
+def _ebay_buying_format(text: str) -> str:
+    """'auction' when the card shows a bid count, else 'buy_it_now'."""
+    return "auction" if _EBAY_BIDS_RE.search(text) else "buy_it_now"
+
+
 def _parse_thumbnail(card: str) -> str | None:
     # The real product image lives on i.ebayimg.com (src or data-defer-load).
     m = _EBAYIMG_RE.search(card)
@@ -522,7 +566,9 @@ def _parse_thumbnail(card: str) -> str | None:
 
 
 def _strip_tags(html: str) -> str:
-    return unescape(_TAG_RE.sub("", html))
+    # Replace tags with a space (not "") so adjacent elements' text doesn't merge
+    # ("5 bids" + "Free delivery" -> "5 bidsFree"), then collapse whitespace.
+    return re.sub(r"\s+", " ", unescape(_TAG_RE.sub(" ", html))).strip()
 
 
 def _to_float(value) -> float | None:

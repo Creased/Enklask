@@ -113,6 +113,8 @@ class Listing(Base):
     location_city: Mapped[str | None] = mapped_column(String(128), nullable=True)
     distance_km: Mapped[float | None] = mapped_column(Float, nullable=True)
     shipping_options: Mapped[list] = mapped_column(JSON, default=list)
+    shipping_cost: Mapped[float | None] = mapped_column(Float, nullable=True)
+    buying_format: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
     status: Mapped[str] = mapped_column(
         String(12), default=ListingStatus.NEW.value, index=True

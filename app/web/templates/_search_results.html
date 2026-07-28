@@ -1,3 +1,4 @@
+{% import "_macros.html" as ui %}
 {% if results %}
 {% set source_styles = {
   "ebay": "bg-blue-50 text-blue-600",
@@ -45,6 +46,7 @@
       {% if r.price is not none %}
       <span class="text-lg font-bold text-gray-900">{{ "%.0f"|format(r.price) }}&nbsp;{{ r.currency }}</span>
       {% endif %}
+      {{ ui.ebay_meta(r.shipping_cost, r.buying_format, r.currency) }}
       <a href="{{ r.url }}" target="_blank" rel="noopener"
          class="text-sm text-gray-700 line-clamp-2 hover:text-brand transition-colors leading-snug">
         {{ r.title }}
@@ -71,6 +73,8 @@
       "title": r.title,
       "price": (("%.0f"|format(r.price)) ~ " " ~ r.currency) if r.price is not none else "",
       "currency": r.currency,
+      "buyingFormat": ("Enchère" if r.buying_format == 'auction' else ("Achat immédiat" if r.buying_format == 'buy_it_now' else "")),
+      "shipping": (("Livraison gratuite" if r.shipping_cost == 0 else ("+" ~ ("%.2f"|format(r.shipping_cost)) ~ " " ~ r.currency ~ " livraison")) if r.shipping_cost is not none else ""),
       "priceHistory": [],
       "source": r.source.value,
       "id": r.source_id,

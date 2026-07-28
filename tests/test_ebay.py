@@ -41,7 +41,7 @@ def test_ebay_api_handles_missing_optional_fields():
     assert raw.posted_at is None
 
 
-def _card(listing_id: str, title: str, price: str = "48,00 EUR") -> str:
+def _card(listing_id: str, title: str, price: str = "48,00 EUR", extra: str = "") -> str:
     return (
         f'<li class="s-card s-card--horizontal" data-listingid="{listing_id}">'
         f'<a class="s-card__link image-treatment" '
@@ -50,7 +50,8 @@ def _card(listing_id: str, title: str, price: str = "48,00 EUR") -> str:
         f'alt="{title}"></a>'
         f'<div role="heading" aria-level="3" class="s-card__title">'
         f'<span class="su-styled-text primary default">{title}</span></div>'
-        f'<span class="su-styled-text primary bold s-card__price">{price}</span></li>'
+        f'<span class="su-styled-text primary bold s-card__price">{price}</span>'
+        f'{extra}</li>'
     )
 
 
@@ -78,3 +79,63 @@ def test_scrape_parser_dedupes_and_skips_placeholder():
     results = _parse_search_html(html)
 
     assert [r.source_id for r in results] == ["111"]
+
+
+# --- shipping cost + auction/buy-it-now -------------------------------------
+
+def test_ebay_shipping_and_format_helpers():
+    from app.sources.ebay import _ebay_buying_format, _parse_ebay_shipping
+
+    # English (the www.ebay.com fallback)
+    assert _parse_ebay_shipping("+$10.43 delivery") == 10.43
+    assert _parse_ebay_shipping("Free delivery") == 0.0
+    assert _ebay_buying_format("Buy It Now") == "buy_it_now"
+    assert _ebay_buying_format("12 bids") == "auction"
+    assert _ebay_buying_format("0 bids or Best Offer") == "auction"
+    assert _ebay_buying_format("or Best Offer") == "buy_it_now"
+    # French (ebay.fr)
+    assert _parse_ebay_shipping("+4,99 EUR livraison") == 4.99
+    assert _parse_ebay_shipping("Livraison gratuite") == 0.0
+    assert _ebay_buying_format("3 enchères") == "auction"
+    # no shipping info in the text
+    assert _parse_ebay_shipping("Située en France") is None
+
+
+def test_ebay_api_shipping_and_format():
+    src = EbaySource()
+    raw = src._api_to_raw(dict(
+        SAMPLE_ITEM,
+        buyingOptions=["AUCTION", "FIXED_PRICE"],
+        shippingOptions=[{"shippingCost": {"value": "4.99", "currency": "EUR"}}],
+    ))
+    assert raw.buying_format == "auction"
+    assert raw.shipping_cost == 4.99
+
+    raw2 = src._api_to_raw(dict(
+        SAMPLE_ITEM,
+        buyingOptions=["FIXED_PRICE"],
+        shippingOptions=[{"shippingCost": {"value": "0.0"}}],
+    ))
+    assert raw2.buying_format == "buy_it_now"
+    assert raw2.shipping_cost == 0.0
+
+    # No buying/shipping options -> both None.
+    raw3 = src._api_to_raw(SAMPLE_ITEM)
+    assert raw3.buying_format is None
+    assert raw3.shipping_cost is None
+
+
+def test_scrape_parser_shipping_and_auction():
+    html = (
+        _card("111", "Switch BIN", extra=(
+            '<div class="s-card__attribute-row">Buy It Now</div>'
+            '<div class="s-card__attribute-row">+$10.43 delivery</div>'
+        ))
+        + _card("222", "Switch Auction", extra=(
+            '<div class="s-card__attribute-row">5 bids</div>'
+            '<div class="s-card__attribute-row">Free delivery</div>'
+        ))
+    )
+    by = {r.source_id: r for r in _parse_search_html(html)}
+    assert by["111"].buying_format == "buy_it_now" and by["111"].shipping_cost == 10.43
+    assert by["222"].buying_format == "auction" and by["222"].shipping_cost == 0.0

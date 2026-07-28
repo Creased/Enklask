@@ -21,6 +21,8 @@ class ListingOut(BaseModel):
     location_city: str | None
     distance_km: float | None
     shipping_options: list
+    shipping_cost: float | None
+    buying_format: str | None
     status: str
     posted_at: datetime | None
     first_seen: datetime
