@@ -131,8 +131,9 @@ APPRISE_URLS=tgram://123456:ABC-DEF.../987654321
 APPRISE_URLS=ntfy://ntfy.sh/switch, discord://id/token
 ```
 
-Each new ad sends one push (title with source + price, body with model/part tags,
-location/distance, and the direct link; the photo is attached when available).
+Each new ad sends one push — on **Discord** a rich embed (title, the listing photo,
+and price/source/location fields); on any other service a text push (source + price,
+model/part tags, location/distance, and the direct link).
 
 Flood guards:
 - **First run is silent.** When the database is empty, that poll just seeds it — no
@@ -167,6 +168,7 @@ Covers the taxonomy classifier, dedup/upsert logic, and the eBay response parser
   TLS fingerprint and self-mint a DataDome cookie, then queries the JSON search API — no
   browser. Needs a reasonably trusted (French residential) egress IP; from a blocked IP it
   reports an error and the other sources keep working.
+
 ## Roadmap
 
 - Saved-search management UI in the dashboard.
