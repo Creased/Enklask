@@ -34,8 +34,6 @@ class Settings(BaseModel):
     enable_vinted: bool = False
     enable_leboncoin: bool = False
     enable_facebook: bool = False
-    enable_rakuten: bool = False
-    enable_geev: bool = False
 
     # eBay Browse API (client-credentials OAuth)
     ebay_client_id: str = ""
@@ -47,15 +45,6 @@ class Settings(BaseModel):
 
     # Leboncoin (unofficial)
     leboncoin_base_url: str = "https://api.leboncoin.fr"
-
-    # Rakuten France
-    rakuten_base_url: str = "https://fr.shopping.rakuten.com"
-
-    # Geev
-    geev_base_url: str = "https://prod.geev.fr"
-    geev_web_base: str = "https://www.geev.com"
-    geev_api_key: str = ""
-    geev_radius_km: int = 50
 
     # Shared cookies.txt file (Netscape format, e.g. from "Get cookies.txt LOCALLY").
     cookies_file: str = "data/cookies.txt"

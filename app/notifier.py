@@ -31,8 +31,6 @@ _SOURCE_COLOR = {
     "vinted": 0x09B1BA,
     "leboncoin": 0xFF6E14,
     "facebook": 0x4267B2,
-    "rakuten": 0xBF0000,
-    "geev": 0x16A34A,
 }
 _DEFAULT_COLOR = 0xE63946  # brand red
 

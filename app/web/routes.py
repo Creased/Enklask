@@ -831,16 +831,14 @@ async def settings_save(request: Request):
 
     bool_fields = [
         "enable_ebay", "enable_vinted", "enable_leboncoin",
-        "enable_facebook", "enable_rakuten", "enable_geev",
+        "enable_facebook",
         "notify_on_first_run",
     ]
-    int_fields = ["poll_interval_minutes", "geev_radius_km", "notify_max_per_poll"]
+    int_fields = ["poll_interval_minutes", "notify_max_per_poll"]
     float_fields = ["home_lat", "home_lon"]
     str_fields = [
         "ebay_client_id", "ebay_client_secret", "ebay_marketplace_id",
         "vinted_base_url", "leboncoin_base_url",
-        "rakuten_base_url",
-        "geev_base_url", "geev_web_base", "geev_api_key",
         "cookies_file",
         "apprise_urls",
     ]

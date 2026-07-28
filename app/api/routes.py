@@ -383,7 +383,6 @@ def read_settings():
     s = get_settings()
     data = s.model_dump()
     data.pop("ebay_client_secret", None)
-    data.pop("geev_api_key", None)
     return data
 
 

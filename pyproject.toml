@@ -1,7 +1,7 @@
 [project]
 name = "enklask"
 version = "0.1.0"
-description = "Enklask — self-hosted multi-marketplace second-hand tracker (eBay, Vinted, Leboncoin, Facebook, Rakuten, Geev)."
+description = "Enklask — self-hosted multi-marketplace second-hand tracker (eBay, Vinted, Leboncoin, Facebook Marketplace)."
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]

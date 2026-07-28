@@ -55,7 +55,7 @@
                    class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
           </label>
           <p class="mt-1.5 text-xs text-gray-400 leading-relaxed">
-            Contourne les protections anti-bot (eBay, Rakuten…).
+            Contourne les protections anti-bot (eBay, Leboncoin…).
             Exportez vos cookies avec
             <a href="https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc" target="_blank" class="text-brand hover:underline">Get cookies.txt LOCALLY</a>
             et placez le fichier dans <code class="bg-warm-100 px-1 rounded text-[11px]">data/</code>.
@@ -91,29 +91,6 @@
 
         {{ source_toggle("vinted", "Vinted", "text-teal-600", "aucune clé requise") }}
         {{ source_toggle("leboncoin", "Leboncoin", "text-orange-600", "aucune clé requise") }}
-        {{ source_toggle("rakuten", "Rakuten", "text-rose-600", "aucune clé requise") }}
-
-        <!-- Geev -->
-        <div class="px-5 py-4">
-          <label class="flex items-center justify-between cursor-pointer">
-            <div class="flex items-center gap-2.5">
-              <span class="text-sm font-semibold text-emerald-600">Geev</span>
-              <span class="text-xs text-gray-400">clé optionnelle</span>
-            </div>
-            <input type="checkbox" name="enable_geev" {% if settings.enable_geev %}checked{% endif %} class="sr-only peer" />
-            <div class="toggle-track peer"></div>
-          </label>
-          <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
-            <input type="text" name="geev_base_url" value="{{ settings.geev_base_url }}" placeholder="URL API"
-                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-xs text-gray-600 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
-            <input type="password" name="geev_api_key" value="{{ settings.geev_api_key }}" placeholder="Clé API (optionnel)"
-                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-xs text-gray-600 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
-            <input type="number" name="geev_radius_km" min="1" value="{{ settings.geev_radius_km }}" placeholder="Rayon km"
-                   class="bg-warm-50 border-0 rounded-xl px-3 py-2 text-xs text-gray-600 focus:ring-2 focus:ring-brand/20 focus:outline-none" />
-          </div>
-          <input type="hidden" name="geev_web_base" value="{{ settings.geev_web_base }}" />
-        </div>
-
         <!-- eBay -->
         <div class="px-5 py-4">
           <label class="flex items-center justify-between cursor-pointer">
@@ -150,7 +127,6 @@
 
         <input type="hidden" name="vinted_base_url" value="{{ settings.vinted_base_url }}" />
         <input type="hidden" name="leboncoin_base_url" value="{{ settings.leboncoin_base_url }}" />
-        <input type="hidden" name="rakuten_base_url" value="{{ settings.rakuten_base_url }}" />
       </div>
     </section>
 

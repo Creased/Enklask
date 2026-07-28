@@ -39,25 +39,11 @@ def _facebook() -> BaseSource:
     return FacebookSource()
 
 
-def _rakuten() -> BaseSource:
-    from .rakuten import RakutenSource
-
-    return RakutenSource()
-
-
-def _geev() -> BaseSource:
-    from .geev import GeevSource
-
-    return GeevSource()
-
-
 _FACTORIES: tuple[Callable[[], BaseSource], ...] = (
     _ebay,
     _vinted,
     _leboncoin,
     _facebook,
-    _rakuten,
-    _geev,
 )
 
 

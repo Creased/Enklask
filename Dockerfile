@@ -1,6 +1,6 @@
 # Slim image — no browser needed. curl_cffi (in requirements.txt) impersonates a
-# real browser's TLS/HTTP2 fingerprint, so every source (Vinted, eBay, Leboncoin,
-# Facebook Marketplace, Rakuten, Geev) crawls over plain HTTP past its bot checks.
+# real browser's TLS/HTTP2 fingerprint, so every source (eBay, Vinted, Leboncoin
+# and Facebook Marketplace) crawls over plain HTTP past its bot checks.
 # No Playwright/Chromium/Xvfb.
 FROM python:3.11-slim
 
