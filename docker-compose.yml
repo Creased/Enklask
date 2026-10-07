@@ -1,6 +1,6 @@
 services:
   ad-tracker:
-    build: .
+    image: ghcr.io/creased/enklask:latest
     container_name: ad-tracker
     restart: unless-stopped
     ports:
