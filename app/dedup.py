@@ -74,6 +74,11 @@ def upsert_listing(
                     tags=tags or [],
                 )
                 session.add(link)
+            else:
+                # Seeing an item again means it is still available, even if a
+                # previous pair of polls had made it disappear from the feed.
+                already_linked.is_available = True
+                already_linked.missed_polls = 0
         return None
 
     settings = get_settings()

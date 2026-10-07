@@ -6,6 +6,7 @@ import re
 from datetime import datetime, timezone
 
 from sqlalchemy import (
+    Boolean,
     JSON,
     DateTime,
     Float,
@@ -81,6 +82,15 @@ class ListingTopic(Base):
         ForeignKey("saved_searches.id", ondelete="SET NULL"), nullable=True
     )
     tags: Mapped[list] = mapped_column(JSON, default=list)
+    # Marketplace availability is kept per topic.  A listing can be returned
+    # by several saved searches/topics, so a single global flag would let one
+    # poll hide an item that is still being seen by another topic.
+    is_available: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="1", index=True
+    )
+    missed_polls: Mapped[int] = mapped_column(
+        Integer, default=0, server_default="0"
+    )
 
     listing: Mapped["Listing"] = relationship(back_populates="topic_links")
     topic: Mapped["Topic"] = relationship(back_populates="listing_links")

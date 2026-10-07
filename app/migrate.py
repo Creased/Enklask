@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 def run_migration() -> None:
     _migrate_to_multi_topic()
     _ensure_saved_search_columns()
+    _ensure_listing_topic_columns()
     _ensure_listing_columns()
     _drop_topic_columns()
 
@@ -72,6 +73,37 @@ def _ensure_saved_search_columns() -> None:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE saved_searches ADD COLUMN condition VARCHAR(16)"))
         logger.info("Added 'condition' column to saved_searches.")
+
+
+def _ensure_listing_topic_columns() -> None:
+    """Add per-topic marketplace availability tracking."""
+    inspector = inspect(engine)
+    if "listing_topics" not in set(inspector.get_table_names()):
+        return
+    columns = {c["name"] for c in inspector.get_columns("listing_topics")}
+    with engine.begin() as conn:
+        if "is_available" not in columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE listing_topics ADD COLUMN "
+                    "is_available BOOLEAN NOT NULL DEFAULT 1"
+                )
+            )
+            logger.info("Added 'is_available' column to listing_topics.")
+        if "missed_polls" not in columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE listing_topics ADD COLUMN "
+                    "missed_polls INTEGER NOT NULL DEFAULT 0"
+                )
+            )
+            logger.info("Added 'missed_polls' column to listing_topics.")
+        conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_listing_topics_is_available "
+                "ON listing_topics (is_available)"
+            )
+        )
 
 
 def _migrate_to_multi_topic() -> None:

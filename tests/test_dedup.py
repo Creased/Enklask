@@ -123,3 +123,39 @@ def test_no_duplicate_topic_link(session, topic):
         .where(ListingTopic.topic_id == topic.id)
     )
     assert count == 1
+
+
+def test_missing_listing_is_hidden_after_two_polls_and_can_reappear(session, topic):
+    from app.dedup import upsert_listing
+    from app.poller import _mark_missing_links
+
+    upsert_listing(session, _raw(), topic_id=topic.id)
+    session.commit()
+    link = session.scalar(select(ListingTopic))
+
+    _mark_missing_links(session, topic.id, Source.EBAY.value, set())
+    assert link.missed_polls == 1
+    assert link.is_available is True
+
+    _mark_missing_links(session, topic.id, Source.EBAY.value, set())
+    assert link.missed_polls == 2
+    assert link.is_available is False
+
+    # A later source result resets both fields through the normal upsert path.
+    upsert_listing(session, _raw(), topic_id=topic.id)
+    assert link.missed_polls == 0
+    assert link.is_available is True
+
+
+def test_listing_query_excludes_unavailable_links(session, topic):
+    from app.api.routes import _query_listings
+    from app.dedup import upsert_listing
+
+    upsert_listing(session, _raw(), topic_id=topic.id)
+    session.commit()
+    assert len(_query_listings(session, topic_id=topic.id, limit=10, offset=0)) == 1
+
+    link = session.scalar(select(ListingTopic))
+    link.is_available = False
+    session.flush()
+    assert _query_listings(session, topic_id=topic.id, limit=10, offset=0) == []

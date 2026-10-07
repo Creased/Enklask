@@ -199,7 +199,10 @@ def _topic_stat(session: Session, topic: Topic) -> dict:
     count = session.scalar(
         select(func.count())
         .select_from(ListingTopic)
-        .where(ListingTopic.topic_id == topic.id)
+        .where(
+            ListingTopic.topic_id == topic.id,
+            ListingTopic.is_available.is_(True),
+        )
     )
     new_count = session.scalar(
         select(func.count())
@@ -208,13 +211,18 @@ def _topic_stat(session: Session, topic: Topic) -> dict:
         .where(
             ListingTopic.topic_id == topic.id,
             Listing.status == ListingStatus.NEW.value,
+            ListingTopic.is_available.is_(True),
         )
     )
     thumbnails = list(
         session.scalars(
             select(Listing.thumbnail)
             .join(ListingTopic, ListingTopic.listing_id == Listing.id)
-            .where(ListingTopic.topic_id == topic.id, Listing.thumbnail.isnot(None))
+            .where(
+                ListingTopic.topic_id == topic.id,
+                ListingTopic.is_available.is_(True),
+                Listing.thumbnail.isnot(None),
+            )
             .order_by(Listing.first_seen.desc())
             .limit(4)
         )
@@ -330,7 +338,10 @@ def topic_detail(
     listing_count = session.scalar(
         select(func.count())
         .select_from(ListingTopic)
-        .where(ListingTopic.topic_id == topic.id)
+        .where(
+            ListingTopic.topic_id == topic.id,
+            ListingTopic.is_available.is_(True),
+        )
     )
 
     all_topics = list(session.scalars(select(Topic).order_by(Topic.position, Topic.id)))
@@ -362,7 +373,10 @@ def topic_settings(slug: str, request: Request, session: Session = Depends(get_s
         s.id: session.scalar(
             select(func.count())
             .select_from(ListingTopic)
-            .where(ListingTopic.search_id == s.id)
+            .where(
+                ListingTopic.search_id == s.id,
+                ListingTopic.is_available.is_(True),
+            )
         )
         for s in topic.searches
     }
@@ -711,7 +725,10 @@ def refresh_search(
     count = session.scalar(
         select(func.count())
         .select_from(ListingTopic)
-        .where(ListingTopic.search_id == search_id)
+        .where(
+            ListingTopic.search_id == search_id,
+            ListingTopic.is_available.is_(True),
+        )
     )
     return templates.TemplateResponse(
         "_search_row.html",

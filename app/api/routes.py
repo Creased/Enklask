@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy import func, nullslast, select
+from sqlalchemy import exists, func, nullslast, select
 from sqlalchemy.orm import Session
 
 from ..config import get_settings, save_settings
@@ -97,9 +97,15 @@ def _query_listings(
             select(Listing)
             .join(ListingTopic, ListingTopic.listing_id == Listing.id)
             .where(ListingTopic.topic_id == topic_id)
+            .where(ListingTopic.is_available.is_(True))
         )
     else:
-        stmt = select(Listing)
+        stmt = select(Listing).where(
+            exists().where(
+                ListingTopic.listing_id == Listing.id,
+                ListingTopic.is_available.is_(True),
+            )
+        )
 
     if source:
         stmt = stmt.where(Listing.source == source)
@@ -223,7 +229,10 @@ def get_topic(slug: str, session: Session = Depends(get_session)):
     count = session.scalar(
         select(func.count())
         .select_from(ListingTopic)
-        .where(ListingTopic.topic_id == topic.id)
+        .where(
+            ListingTopic.topic_id == topic.id,
+            ListingTopic.is_available.is_(True),
+        )
     )
     return {
         **TopicOut.model_validate(topic).model_dump(),
