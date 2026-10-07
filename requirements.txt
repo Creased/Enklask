@@ -7,6 +7,8 @@ pydantic-settings==2.7.1
 httpx==0.28.1
 # Browser-TLS impersonation — the Leboncoin DataDome bypass (no browser needed).
 curl_cffi>=0.7,<1.0
+# Persistent anti-detect browser for Vinted's JavaScript Cloudflare clearance.
+camoufox==0.5.7
 APScheduler==3.11.0
 # Time-zone database (slim images ship none) for normalizing source dates.
 tzdata==2025.2

@@ -41,6 +41,7 @@ class Settings(BaseModel):
 
     # Vinted (unofficial)
     vinted_base_url: str = "https://www.vinted.fr"
+    vinted_browser_profile_dir: str = "data/vinted-camoufox-profile"
 
     # Leboncoin (unofficial)
     leboncoin_base_url: str = "https://api.leboncoin.fr"

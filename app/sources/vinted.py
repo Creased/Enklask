@@ -1,10 +1,14 @@
-"""Vinted source adapter (unofficial internal API).
+"""Vinted source adapter (unofficial browser scraper).
 
-Vinted has no public API. Its website talks to an internal JSON endpoint
-(``/api/v2/catalog/items``) that works anonymously once a session cookie has
-been obtained by first loading the homepage. This is unofficial and may break
-when Vinted changes things — it is isolated so a failure never affects other
-sources.
+Vinted has no public API. Search results are server-rendered into the Next.js
+React Server Components payload of ``/catalog``. The old
+``/api/v2/catalog/items`` endpoint is no longer used by the website.
+
+The catalogue sits behind Cloudflare, so a persistent Camoufox session warms
+the homepage before loading search and item pages.
+
+This is unofficial and may break when Vinted changes things — it is isolated so
+a failure never affects other sources.
 """
 
 from __future__ import annotations
@@ -14,18 +18,12 @@ import logging
 import re
 from datetime import datetime, timezone
 
-import httpx
-
 from ..config import get_settings
 from ..enums import Source
 from .base import BaseSource, RawListing, SearchQuery
+from .vinted_browser import fetch_vinted_html
 
 logger = logging.getLogger(__name__)
-
-_USER_AGENT = (
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-)
 
 # Generic sort -> Vinted "order" (no native oldest; falls back to newest).
 _ORDER = {
@@ -47,6 +45,10 @@ _CONDITION = {
 }
 
 
+class VintedParseError(RuntimeError):
+    """Raised when Vinted's catalogue no longer contains the expected payload."""
+
+
 class VintedSource(BaseSource):
     name = Source.VINTED
 
@@ -58,25 +60,10 @@ class VintedSource(BaseSource):
     def enabled(self) -> bool:
         return bool(self._settings.enable_vinted)
 
-    def _client(self) -> httpx.Client:
-        """A fresh client configured for Vinted (no request issued yet)."""
-        return httpx.Client(
-            base_url=self._base,
-            headers={
-                "User-Agent": _USER_AGENT,
-                "Accept": "application/json, text/plain, */*",
-                "Accept-Language": "fr-FR,fr;q=0.9",
-            },
-            timeout=30.0,
-            follow_redirects=True,
-        )
-
     def search(self, query: SearchQuery) -> list[RawListing]:
         params: dict[str, str | int] = {
             "search_text": query.query,
-            "per_page": 60,
             "order": _ORDER.get(query.sort, "newest_first"),
-            "currency": "EUR",
         }
         if query.price_min:
             params["price_from"] = query.price_min
@@ -85,20 +72,34 @@ class VintedSource(BaseSource):
         if query.condition and query.condition in _CONDITION:
             params["status_ids[]"] = _CONDITION[query.condition]
 
-        with self._client() as client:
-            # Hitting the homepage sets the anonymous session cookie the API needs.
-            client.get("/")
-            resp = client.get("/api/v2/catalog/items", params=params)
-            resp.raise_for_status()
-            items = resp.json().get("items", []) or []
+        html = self._get_html("/catalog", params=params)
+        items = _extract_catalog_items(html)
+        if items is None:
+            raise VintedParseError(
+                "Vinted returned a catalogue page without its Next.js items payload."
+            )
         return [self._to_raw(item) for item in items]
 
+    def _get_html(self, path: str, *, params: dict | None = None) -> str:
+        return fetch_vinted_html(
+            self._base,
+            self._settings.vinted_browser_profile_dir,
+            path,
+            params,
+        )
+
     def _to_raw(self, item: dict) -> RawListing:
+        # Current catalogue SSR shape wraps each listing in ``productItem``;
+        # retaining the old flat shape keeps saved fixtures/backward parsing.
+        item = item.get("productItem") or item
         price, currency = _parse_price(item)
         photo = item.get("photo") or {}
+        current_photos = item.get("photos") or []
+        photos = [p.get("url") for p in current_photos if p.get("url")]
         full = photo.get("full_size_url") or photo.get("url")
-        thumb = photo.get("url") or full
-        photos = [full] if full else []
+        if not photos and full:
+            photos = [full]
+        thumb = item.get("thumbnailUrl") or photo.get("url") or full
 
         url = item.get("url") or ""
         if url and url.startswith("/"):
@@ -130,13 +131,7 @@ def fetch_detail(item_id: str) -> dict:
     if not src.enabled or not item_id:
         return {"description": "", "photos": []}
     try:
-        with src._client() as client:
-            client.get("/")  # anonymous session cookie
-            resp = client.get(
-                f"/items/{item_id}",
-                headers={"Accept": "text/html,application/xhtml+xml"},
-            )
-        html = resp.text if resp.status_code == 200 else ""
+        html = src._get_html(f"/items/{item_id}")
     except Exception as exc:  # noqa: BLE001
         logger.debug("Vinted detail fetch failed for %s: %s", item_id, exc)
         return {"description": "", "photos": []}
@@ -209,7 +204,7 @@ def _parse_price(item: dict) -> tuple[float | None, str]:
     # Newer API: {"amount": "12.0", "currency_code": "EUR"}
     if isinstance(price, dict):
         amount = price.get("amount")
-        currency = price.get("currency_code", "EUR")
+        currency = price.get("currency_code") or price.get("currencyCode", "EUR")
     else:
         amount = price
         currency = item.get("currency", "EUR")
@@ -217,3 +212,82 @@ def _parse_price(item: dict) -> tuple[float | None, str]:
         return (float(amount) if amount is not None else None), currency
     except (TypeError, ValueError):
         return None, currency
+
+
+_NEXT_PUSH = "self.__next_f.push("
+_ITEMS_MARKER = '"items":{"items":['
+
+
+def _extract_catalog_items(html: str) -> list[dict] | None:
+    """Extract catalogue items from Vinted's Next.js RSC bootstrap payload.
+
+    Each inline script calls ``self.__next_f.push([id, "..."])``. The second
+    value is a decoded RSC stream containing ordinary JSON fragments. We locate
+    the catalogue state and parse only its balanced ``items`` array instead of
+    depending on unstable generated class names in the rendered HTML.
+    """
+    scripts = re.findall(r"<script(?:\s[^>]*)?>(.*?)</script>", html, re.I | re.S)
+    for script in scripts:
+        text = script.strip()
+        if not text.startswith(_NEXT_PUSH) or not text.endswith(")"):
+            continue
+        try:
+            pushed = json.loads(text[len(_NEXT_PUSH):-1])
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        if not isinstance(pushed, list) or len(pushed) < 2:
+            continue
+        payload = pushed[1]
+        if not isinstance(payload, str):
+            continue
+
+        offset = 0
+        while True:
+            marker = payload.find(_ITEMS_MARKER, offset)
+            if marker < 0:
+                break
+            start = marker + len(_ITEMS_MARKER) - 1
+            raw = _balanced_json(payload, start, "[", "]")
+            if raw:
+                try:
+                    items = json.loads(raw)
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    items = []
+                if isinstance(items, list) and (
+                    not items
+                    or any(
+                        isinstance(item, dict) and item.get("productItem")
+                        for item in items
+                    )
+                ):
+                    return items
+            offset = start + 1
+    return None
+
+
+def _balanced_json(text: str, start: int, opener: str, closer: str) -> str:
+    """Return one balanced JSON container while respecting quoted strings."""
+    if start >= len(text) or text[start] != opener:
+        return ""
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start, len(text)):
+        char = text[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == opener:
+            depth += 1
+        elif char == closer:
+            depth -= 1
+            if depth == 0:
+                return text[start:index + 1]
+    return ""
