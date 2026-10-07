@@ -18,8 +18,8 @@
 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
   {% for r in results %}
   <div class="listing-card relative bg-white rounded-2xl border border-warm-200 overflow-hidden flex flex-col">
-    <a href="{{ r.url }}" target="_blank" rel="noopener"
-       class="block bg-warm-100 aspect-[4/3] overflow-hidden relative group">
+    <button type="button" onclick="openPreview(this)" title="Aperçu de l'annonce"
+            class="block w-full bg-warm-100 aspect-[4/3] overflow-hidden relative group cursor-zoom-in">
       {% if r.thumbnail %}
       <img src="{{ r.thumbnail }}" alt="" loading="lazy"
            class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -34,7 +34,7 @@
                    {{ source_styles.get(r.source.value, 'bg-gray-50 text-gray-600') }}">
         {{ r.source.value }}
       </span>
-    </a>
+    </button>
 
     <button type="button" onclick="openPreview(this)" title="Aperçu"
             class="preview-btn absolute top-2.5 right-2.5 z-10 w-8 h-8 flex items-center justify-center rounded-lg bg-white/90 backdrop-blur border border-warm-200 text-gray-500 hover:text-brand hover:border-brand/30 transition shadow-sm">
