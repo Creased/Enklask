@@ -496,7 +496,8 @@ def search_results_partial(request: Request):
     q = request.query_params.get("q", "").strip()
     if not q:
         return templates.TemplateResponse("_search_results.html", {
-            "request": request, "results": [], "q": "", "has_distance": False,
+            "request": request, "results": [], "errors": {}, "q": "",
+            "has_distance": False,
         })
 
     def _fnum(name: str) -> float | None:
@@ -525,6 +526,7 @@ def search_results_partial(request: Request):
         sources = [s for s in sources if s.name.value == source_filter]
 
     per_source: list[list] = []
+    errors: dict[str, str] = {}
     for source in sources:
         try:
             found = source.search(query)
@@ -532,6 +534,7 @@ def search_results_partial(request: Request):
                 per_source.append(found)
         except Exception as exc:
             logger.warning("Live search: source %s failed: %s", source.name.value, exc)
+            errors[source.name.value] = str(exc) or type(exc).__name__
 
     results = _interleave(per_source)
 
@@ -555,6 +558,7 @@ def search_results_partial(request: Request):
     return templates.TemplateResponse("_search_results.html", {
         "request": request,
         "results": results,
+        "errors": errors,
         "q": q,
         "has_distance": has_distance,
     })

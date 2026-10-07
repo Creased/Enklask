@@ -1,4 +1,15 @@
 {% import "_macros.html" as ui %}
+{% if errors %}
+<div class="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+  <p class="font-semibold">Certaines sources n'ont pas pu être interrogées.</p>
+  <ul class="mt-1 space-y-0.5 text-xs">
+    {% for source, message in errors.items() %}
+    <li><span class="font-semibold">{{ source | capitalize }}</span> — {{ message }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
 {% if results %}
 {% set source_styles = {
   "ebay": "bg-blue-50 text-blue-600",
@@ -94,7 +105,7 @@
       <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
     </svg>
   </div>
-  <p class="text-gray-400 text-sm mb-1">Aucun résultat</p>
+  <p class="text-gray-400 text-sm mb-1">{% if errors %}Aucun résultat disponible{% else %}Aucun résultat{% endif %}</p>
   <p class="text-gray-300 text-xs">Essaie d'autres termes/filtres ou vérifie tes sources actives</p>
 </div>
 {% endif %}
