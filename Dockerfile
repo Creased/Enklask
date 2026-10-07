@@ -48,10 +48,12 @@ RUN apt-get update \
     && apt-get purge -y --auto-remove \
         build-essential \
         libzstd-dev \
+    && python -m playwright install-deps firefox \
     && rm -rf /var/lib/apt/lists/*
 
 # Download the Camoufox browser build matching the current CPU architecture.
-RUN python -m camoufox fetch
+RUN python -m camoufox fetch \
+    && python -c "from camoufox.sync_api import Camoufox; manager = Camoufox(headless='virtual'); browser = manager.__enter__(); print(browser.version); manager.__exit__(None, None, None)"
 
 COPY app ./app
 
