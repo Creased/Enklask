@@ -32,7 +32,9 @@ location is configurable — track anything: a console, a bike, a camera lens, a
 - Unified feed of ads from every enabled marketplace, newest first.
 - Automatic classification by **console model** (V1/V2/Lite/OLED) and **part type**
   (job lot, for parts, motherboard, chassis, screen, joycon, battery).
-- Filters: source, model, part, max price, distance from home, shipping option, status.
+- Filters: source, model, part, min/max price, distance from home, shipping option, status.
+- Ads no longer returned by their marketplace (typically sold, reserved or
+  withdrawn) are hidden after two complete refreshes; they reappear if listed again.
 - Distance to each ad computed from your home coordinates.
 - "Like" and "Hide" actions; deep link to buy/like on the original site.
 - Background scheduler polls on an interval; "Rafraîchir" button polls on demand.
@@ -157,13 +159,16 @@ pip install pytest
 pytest
 ```
 
-Covers the taxonomy classifier, dedup/upsert logic, and the eBay response parser
-(no live network needed).
+Covers the taxonomy classifier, polling/dedup logic, and marketplace response
+parsers (no live network needed).
 
 ### Enabling the unofficial sources
 
-- **Vinted** — set `ENABLE_VINTED=true`. No credentials; cookies are bootstrapped
-  automatically. If it stops returning results, Vinted likely changed its internal API.
+- **Vinted** — set `ENABLE_VINTED=true`. A persistent Camoufox browser
+  session (profile stored in `data/vinted-camoufox-profile`) warms the homepage,
+  completes the JavaScript challenge, and loads `/catalog`; the connector then
+  parses its server-rendered Next.js payload. Docker runs the headed browser in
+  Xvfb, so no window is displayed.
 - **Leboncoin** — set `ENABLE_LEBONCOIN=true`. Uses `curl_cffi` to impersonate a browser's
   TLS fingerprint and self-mint a DataDome cookie, then queries the JSON search API — no
   browser. Needs a reasonably trusted (French residential) egress IP; from a blocked IP it
