@@ -80,6 +80,8 @@
     </div>
     <form method="post" action="/search/save" class="p-6 space-y-4">
       <input type="hidden" name="query" id="save-query" />
+      <input type="hidden" name="price_min" id="save-price-min" />
+      <input type="hidden" name="price_max" id="save-price-max" />
 
       <label class="flex flex-col gap-1.5">
         <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Nom</span>
@@ -147,6 +149,9 @@ function openSaveModal() {
   var liveCond = document.querySelector('form[hx-get="/search/results"] select[name="condition"]');
   var saveCond = document.getElementById('save-condition');
   if (liveCond && saveCond) saveCond.value = liveCond.value;
+  var liveForm = document.querySelector('form[hx-get="/search/results"]');
+  document.getElementById('save-price-min').value = liveForm.querySelector('[name="price_min"]').value;
+  document.getElementById('save-price-max').value = liveForm.querySelector('[name="price_max"]').value;
   // Reveal the new-topic fields if "Nouveau topic" is already selected
   // (the default when no topics exist yet) — onchange won't have fired.
   var sel = document.getElementById('save-topic-select');

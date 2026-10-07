@@ -46,6 +46,7 @@ class SavedSearchOut(BaseModel):
     topic_id: int
     name: str
     query: str
+    price_min: float | None
     price_max: float | None
     max_distance_km: float | None
     sources: list

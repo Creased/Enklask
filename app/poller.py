@@ -101,7 +101,7 @@ def poll_search(search_id: int) -> PollResult:
         if topic is None:
             return result
         # Touch attributes so they stay usable after the session closes.
-        _ = (search.query, search.price_max, search.max_distance_km,
+        _ = (search.query, search.price_min, search.price_max, search.max_distance_km,
              search.condition, search.sources, search.tags, search.id,
              topic.id, topic.name, topic.apprise_url_list)
         is_cold_start = (
@@ -158,6 +158,7 @@ def _poll_one(topic, search, sources) -> tuple[int, int, dict, list]:
 
     query = SearchQuery(
         query=search.query,
+        price_min=search.price_min,
         price_max=search.price_max,
         max_distance_km=search.max_distance_km,
         condition=search.condition,

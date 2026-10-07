@@ -66,6 +66,15 @@ def _timeago(value) -> str:
 
 templates.env.filters["timeago"] = _timeago
 
+
+def _optional_float(value) -> float | None:
+    """Parse an optional form number without turning a bad value into an error."""
+    try:
+        return float(value) if value not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
 SHIPPING_LABELS = {
     "vinted_go": "Vinted Go",
     "mondial_relay": "Mondial Relay",
@@ -408,19 +417,12 @@ async def add_search(slug: str, request: Request, session: Session = Depends(get
     tags_raw = form.get("tags", "")
     tags = [t.strip() for t in tags_raw.split(",") if t.strip()]
 
-    price_max = None
-    pm = form.get("price_max", "")
-    if pm:
-        try:
-            price_max = float(pm)
-        except ValueError:
-            pass
-
     search = SavedSearch(
         topic_id=topic.id,
         name=form.get("name", query[:64]),
         query=query,
-        price_max=price_max,
+        price_min=_optional_float(form.get("price_min")),
+        price_max=_optional_float(form.get("price_max")),
         condition=(form.get("condition") or None),
         tags=tags,
     )
@@ -578,6 +580,8 @@ async def save_search(request: Request, session: Session = Depends(get_session))
         topic_id=topic.id,
         name=form.get("name") or query[:64],
         query=query,
+        price_min=_optional_float(form.get("price_min")),
+        price_max=_optional_float(form.get("price_max")),
         condition=(form.get("condition") or None),
         tags=tags,
     )

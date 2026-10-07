@@ -64,6 +64,10 @@ def _ensure_saved_search_columns() -> None:
     if "saved_searches" not in set(inspector.get_table_names()):
         return
     columns = {c["name"] for c in inspector.get_columns("saved_searches")}
+    if "price_min" not in columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE saved_searches ADD COLUMN price_min FLOAT"))
+        logger.info("Added 'price_min' column to saved_searches.")
     if "condition" not in columns:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE saved_searches ADD COLUMN condition VARCHAR(16)"))

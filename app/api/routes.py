@@ -145,6 +145,7 @@ def list_listings(
     topic_id: int | None = None,
     source: str | None = None,
     status: str | None = None,
+    price_min: float | None = None,
     price_max: float | None = None,
     distance_max: float | None = None,
     shipping: str | None = None,
@@ -157,6 +158,7 @@ def list_listings(
         topic_id=topic_id,
         source=source,
         status=status,
+        price_min=price_min,
         price_max=price_max,
         distance_max=distance_max,
         shipping=shipping,
@@ -269,6 +271,7 @@ def create_search(slug: str, body: dict, session: Session = Depends(get_session)
         topic_id=topic.id,
         name=body.get("name", body.get("query", "")[:64]),
         query=body.get("query", ""),
+        price_min=body.get("price_min"),
         price_max=body.get("price_max"),
         max_distance_km=body.get("max_distance_km"),
         sources=body.get("sources", []),
@@ -298,6 +301,7 @@ def delete_search(slug: str, search_id: int, session: Session = Depends(get_sess
 @router.get("/search")
 def live_search(
     q: str = "",
+    price_min: float | None = None,
     price_max: float | None = None,
     distance_max: float | None = None,
     session: Session = Depends(get_session),
@@ -307,7 +311,12 @@ def live_search(
     from .sources.base import SearchQuery
     from .sources.registry import get_enabled_sources
 
-    query = SearchQuery(query=q, price_max=price_max, max_distance_km=distance_max)
+    query = SearchQuery(
+        query=q,
+        price_min=price_min,
+        price_max=price_max,
+        max_distance_km=distance_max,
+    )
     results = []
     for source in get_enabled_sources():
         try:

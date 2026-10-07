@@ -140,6 +140,7 @@ class SavedSearch(Base):
     )
     name: Mapped[str] = mapped_column(String(128))
     query: Mapped[str] = mapped_column(String(512), default="")
+    price_min: Mapped[float | None] = mapped_column(Float, nullable=True)
     price_max: Mapped[float | None] = mapped_column(Float, nullable=True)
     max_distance_km: Mapped[float | None] = mapped_column(Float, nullable=True)
     # Generic condition bucket (new/like_new/good/fair/for_parts); None = any.

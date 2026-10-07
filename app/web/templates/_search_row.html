@@ -9,8 +9,12 @@
       {% endfor %}
     </div>
     {% endif %}
-    {% if search.price_max %}
-    <span class="text-[10px] text-gray-400 mt-1 inline-block">Max: {{ "%.0f"|format(search.price_max) }} €</span>
+    {% if search.price_min is not none or search.price_max is not none %}
+    <span class="text-[10px] text-gray-400 mt-1 inline-block">
+      {% if search.price_min is not none %}Min: {{ "%.0f"|format(search.price_min) }} €{% endif %}
+      {% if search.price_min is not none and search.price_max is not none %} · {% endif %}
+      {% if search.price_max is not none %}Max: {{ "%.0f"|format(search.price_max) }} €{% endif %}
+    </span>
     {% endif %}
     {% if search.condition %}
     <span class="text-[10px] text-gray-400 mt-1 inline-block">· État : {{ (condition_labels or {}).get(search.condition, search.condition) }}</span>
