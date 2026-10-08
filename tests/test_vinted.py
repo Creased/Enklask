@@ -2,7 +2,7 @@ import json
 
 from app.enums import Source
 from app.sources.base import SearchQuery
-from app.sources.vinted import VintedSource, _extract_catalog_items
+from app.sources.vinted import VintedSource, _extract_catalog_items, _extract_photos
 
 # Newer Vinted catalog item shape.
 ITEM_NEW = {
@@ -93,6 +93,19 @@ def test_extract_catalog_items_accepts_empty_results():
     state = '99:{"items":{"items":[],"pagination":{"current_page":1}}}'
     script = "self.__next_f.push(" + json.dumps([1, state]) + ")"
     assert _extract_catalog_items(f"<script>{script}</script>") == []
+
+
+def test_extract_photos_uses_current_top_level_urls():
+    html = r'''\"photos\":[
+        {\"thumbnails\":[{\"url\":\"https://images.vinted.net/thumb.jpg\"}],
+         \"url\":\"https://images.vinted.net/first.jpg\"},
+        {\"url\":\"https://images.vinted.net/second.jpg\"}
+    ]'''
+
+    assert _extract_photos(html) == [
+        "https://images.vinted.net/first.jpg",
+        "https://images.vinted.net/second.jpg",
+    ]
 
 
 def test_search_warms_and_scrapes_catalog_page(monkeypatch):

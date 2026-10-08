@@ -148,21 +148,18 @@ def _extract_photos(html: str) -> list[str]:
         return []
     chunk = html[start:start + 60000].replace('\\"', '"')  # undo string-escaping
     bracket = chunk.find("[")
-    depth = 0
-    end = -1
-    for k in range(bracket, len(chunk)):
-        if chunk[k] == "[":
-            depth += 1
-        elif chunk[k] == "]":
-            depth -= 1
-            if depth == 0:
-                end = k
-                break
-    arr = chunk[bracket:end + 1] if end > 0 else chunk[bracket:]
+    arr = _balanced_json(chunk, bracket, "[", "]")
+    try:
+        photos = json.loads(arr)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return []
     out: list[str] = []
     seen: set[str] = set()
-    for url in re.findall(r'"full_size_url":"(https://[^"]+)"', arr):
-        if url not in seen:
+    for photo in photos:
+        if not isinstance(photo, dict):
+            continue
+        url = photo.get("full_size_url") or photo.get("url")
+        if url and url not in seen:
             seen.add(url)
             out.append(url)
     return out
