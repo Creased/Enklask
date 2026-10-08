@@ -457,6 +457,7 @@ def _looks_challenged(html: str) -> bool:
         "pardon our interruption" in head
         or "nous sommes" in head
         or "splashui/challenge" in head
+        or "error page | ebay" in head
     )
 
 
@@ -588,24 +589,52 @@ def _parse_date(value: str | None) -> datetime | None:
 
 
 def fetch_detail(item_id: str) -> dict:
-    """The seller's item description (lazy modal preview).
+    """The seller's item description and photo gallery (lazy modal preview).
 
     eBay serves the description in a separate iframe document
-    (``itm.ebaydesc.com``) — the search card has none. No extra photos are
-    available there, so only the description is returned. Best-effort.
+    (``itm.ebaydesc.com``) and the gallery on the item page. Best-effort.
     """
     if not HAVE_CURL_CFFI or not item_id:
         return {"description": "", "photos": []}
+    listing_id = item_id.split("|")[1] if "|" in item_id else item_id
+    photos: list[str] = []
+    try:
+        src = EbaySource()
+        html = src._fetch_via_curl(
+            f"https://www.ebay.com/itm/{listing_id}", "https://www.ebay.com"
+        )
+        photos = _extract_item_photos(html)
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("eBay gallery fetch failed for %s: %s", listing_id, exc)
     try:
         sess = cffi_requests.Session(impersonate=random.choice(_IMPERSONATIONS))
         html = sess.get(
-            f"https://itm.ebaydesc.com/itmdesc/{item_id}", timeout=20.0
+            f"https://itm.ebaydesc.com/itmdesc/{listing_id}", timeout=20.0
         ).text
         sess.close()
     except Exception as exc:  # noqa: BLE001
-        logger.debug("eBay description fetch failed for %s: %s", item_id, exc)
-        return {"description": "", "photos": []}
-    return {"description": _clean_description(html), "photos": []}
+        logger.debug("eBay description fetch failed for %s: %s", listing_id, exc)
+        return {"description": "", "photos": photos}
+    return {"description": _clean_description(html), "photos": photos}
+
+
+def _extract_item_photos(html: str) -> list[str]:
+    """High-resolution URLs from the item's own thumbnail strip."""
+    start = re.search(r'data-testid=["\']?x-photos-min-view', html, re.I)
+    if not start:
+        return []
+    end = re.search(
+        r'data-testid=["\']?ux-image-carousel-container',
+        html[start.end():],
+        re.I,
+    )
+    gallery = html[start.end():start.end() + end.start()] if end else ""
+    photos: list[str] = []
+    for url in _EBAYIMG_RE.findall(gallery):
+        url = re.sub(r"/s-l\d+\.", "/s-l1600.", unescape(url))
+        if url not in photos:
+            photos.append(url)
+    return photos
 
 
 _SCRIPT_STYLE_RE = re.compile(r"(?is)<(script|style)\b.*?</\1>")

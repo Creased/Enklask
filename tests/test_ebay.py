@@ -1,5 +1,5 @@
 from app.enums import Source
-from app.sources.ebay import EbaySource, _parse_search_html
+from app.sources.ebay import EbaySource, _extract_item_photos, _parse_search_html
 
 # A trimmed-down sample of a Browse API item_summary response item.
 SAMPLE_ITEM = {
@@ -79,6 +79,23 @@ def test_scrape_parser_dedupes_and_skips_placeholder():
     results = _parse_search_html(html)
 
     assert [r.source_id for r in results] == ["111"]
+
+
+def test_extract_item_photos_uses_only_the_main_gallery():
+    html = '''
+        <img src=https://i.ebayimg.com/images/g/recommendation/s-l140.webp>
+        <div data-testid=x-photos-min-view>
+          <img src=https://i.ebayimg.com/images/g/first/s-l140.webp>
+          <img src="https://i.ebayimg.com/images/g/second/s-l500.jpg">
+        </div>
+        <div data-testid=ux-image-carousel-container></div>
+        <img src=https://i.ebayimg.com/images/g/another/s-l140.webp>
+    '''
+
+    assert _extract_item_photos(html) == [
+        "https://i.ebayimg.com/images/g/first/s-l1600.webp",
+        "https://i.ebayimg.com/images/g/second/s-l1600.jpg",
+    ]
 
 
 # --- shipping cost + auction/buy-it-now -------------------------------------
