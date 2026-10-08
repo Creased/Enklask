@@ -52,18 +52,21 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Download the Camoufox browser build matching the current CPU architecture.
-RUN python -m camoufox fetch \
-    && python -c "from camoufox.sync_api import Camoufox; manager = Camoufox(headless='virtual'); browser = manager.__enter__(); print(browser.version); manager.__exit__(None, None, None)"
+ENV XDG_CACHE_HOME=/app/cache
 
-ENV HOME=/app/data \
-    XDG_CACHE_HOME=/root/.cache
+RUN mkdir -p "$XDG_CACHE_HOME" \
+    && python -m camoufox fetch \
+    && python -c "from camoufox.sync_api import Camoufox; manager = Camoufox(headless='virtual'); browser = manager.__enter__(); print(browser.version); manager.__exit__(None, None, None)" \
+    && chmod -R a+rwX "$XDG_CACHE_HOME"
+
+ENV HOME=/app/data
 
 COPY app ./app
 
 # SQLite database lives here; mount a volume to persist it.
 RUN mkdir -p /app/data
 
-VOLUME ["/app/data", "/root/.cache/camoufox", "/tmp"]
+VOLUME ["/app/data", "/app/cache", "/tmp"]
 
 EXPOSE 8000
 
