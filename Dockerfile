@@ -55,12 +55,15 @@ RUN apt-get update \
 RUN python -m camoufox fetch \
     && python -c "from camoufox.sync_api import Camoufox; manager = Camoufox(headless='virtual'); browser = manager.__enter__(); print(browser.version); manager.__exit__(None, None, None)"
 
+ENV HOME=/app/data \
+    XDG_CACHE_HOME=/root/.cache
+
 COPY app ./app
 
 # SQLite database lives here; mount a volume to persist it.
 RUN mkdir -p /app/data
 
-VOLUME ["/app/data"]
+VOLUME ["/app/data", "/root/.cache/camoufox", "/tmp"]
 
 EXPOSE 8000
 
