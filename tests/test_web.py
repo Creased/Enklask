@@ -16,6 +16,12 @@ def test_listing_images_open_the_preview():
         assert "cursor-zoom-in" in source
 
 
+def test_preview_history_is_short_and_rejects_polluted_trails():
+    history = [{"price": price} for price in range(10)]
+    assert web_routes._preview_history(history) == history[-6:]
+    assert web_routes._preview_history(history * 6) == []
+
+
 class _Source:
     def __init__(self, name, *, results=None, error=None):
         self.name = name

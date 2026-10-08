@@ -81,6 +81,22 @@ def test_price_history_unchanged_price_no_growth(session, topic):
     assert [e["price"] for e in listing.price_history] == [60.0]
 
 
+def test_currency_change_starts_a_new_price_history(session, topic):
+    from app.dedup import upsert_listing
+
+    upsert_listing(session, _raw(price=60.0, currency="EUR"), topic_id=topic.id)
+    session.commit()
+    upsert_listing(session, _raw(price=50.0, currency="EUR"), topic_id=topic.id)
+    session.commit()
+    upsert_listing(session, _raw(price=55.0, currency="USD"), topic_id=topic.id)
+    session.commit()
+
+    listing = session.scalar(select(Listing))
+    assert listing.price == 55.0
+    assert listing.currency == "USD"
+    assert [e["price"] for e in listing.price_history] == [55.0]
+
+
 def test_distinct_ids_create_rows(session, topic):
     from app.dedup import upsert_listing
 

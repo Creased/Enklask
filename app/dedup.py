@@ -43,7 +43,13 @@ def upsert_listing(
         existing.last_seen = datetime.now(timezone.utc)
         # Record a price change so drops/rises can be shown. Seed the prior price
         # the first time so the very first change keeps both endpoints.
-        if raw.price is not None and raw.price != existing.price:
+        # A marketplace fallback may expose the same item in another currency;
+        # that is a conversion, not a price change, so start a fresh trail.
+        if raw.price is not None and raw.currency != existing.currency:
+            existing.price = raw.price
+            existing.currency = raw.currency
+            existing.price_history = [{"price": raw.price, "at": _iso(None)}]
+        elif raw.price is not None and raw.price != existing.price:
             history = list(existing.price_history or [])
             if not history and existing.price is not None:
                 history.append({"price": existing.price, "at": _iso(existing.first_seen)})

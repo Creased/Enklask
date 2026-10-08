@@ -67,6 +67,15 @@ def _timeago(value) -> str:
 templates.env.filters["timeago"] = _timeago
 
 
+def _preview_history(value) -> list:
+    """Keep the modal compact and suppress obviously corrupted price trails."""
+    history = value if isinstance(value, list) else []
+    return [] if len(history) > 50 else history[-6:]
+
+
+templates.env.filters["preview_history"] = _preview_history
+
+
 def _optional_float(value) -> float | None:
     """Parse an optional form number without turning a bad value into an error."""
     try:
