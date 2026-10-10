@@ -1,23 +1,23 @@
-"""Leboncoin source adapter (curl_cffi self-minting transport).
+"""Leboncoin source adapter (curl_cffi browser transport).
 
 Leboncoin's API sits behind DataDome, which blocks plain HTTP clients on their
 TLS/JA3 fingerprint *before* the cookie is even checked. ``curl_cffi``
-impersonates a real browser's TLS + HTTP/2 fingerprint: a homepage warm-up makes
-DataDome issue a ``datadome`` cookie to the client itself, then POSTing the
-search to ``/finder/search`` returns clean JSON — no browser, no manual cookie.
-On a 403 the identity (UA + TLS profile + cookie) is rotated and retried.
-
-The only requirement is a reasonably trusted (French residential) egress IP. If
-``curl_cffi`` is unavailable, it falls back to an httpx POST seeded with a
-``datadome`` cookie from cookies.txt.
+impersonates a real browser's TLS + HTTP/2 fingerprint. A passing session is
+kept for later searches so its identity and refreshed ``datadome`` cookie age
+together, matching the lifecycle used by DataDome's Android SDK. When the API
+explicitly requests its JavaScript device check, the connector switches to a
+persistent Camoufox browser context. An exported cookie remains available as an
+httpx fallback when curl_cffi is unavailable.
 """
 
 from __future__ import annotations
 
 import logging
-import os
 import random
+import threading
+import time
 from datetime import datetime, timezone
+from typing import Any
 
 try:  # Leboncoin timestamps are Europe/Paris local; normalize them to UTC.
     from zoneinfo import ZoneInfo
@@ -46,15 +46,25 @@ logger = logging.getLogger(__name__)
 _SEARCH_URL = "https://api.leboncoin.fr/finder/search"
 _WEB_BASE = "https://www.leboncoin.fr"
 
-# Public web api_key — optional once the datadome cookie is valid, sent for
-# parity with the app. Refresh first if the API ever starts 401-ing.
+# Public web-frontend api_key. It is not an account credential.
 _API_KEY = "ba0c2dad52b3ec"
 
-# Browser TLS profiles curl_cffi can impersonate; one is picked per session so
-# retries vary the fingerprint.
-_IMPERSONATIONS = ["safari_ios", "chrome_android", "safari", "firefox"]
-_ANDROID_MODELS = ["Pixel 7", "Pixel 8", "SM-G991B", "SM-S911B", "SM-A546B"]
-_MAX_RETRIES = 4
+# Keep the TLS profile and curl_cffi-generated headers coherent. Desktop
+# profiles paired with an app-style mobile User-Agent were measurably less
+# reliable and create a fingerprint that no real client sends.
+_MOBILE_IMPERSONATIONS = ("safari_ios", "chrome_android")
+_MAX_FRESH_ATTEMPTS = 2
+_BACKOFF_BASE_SECONDS = 2.0
+_BLOCK_COOLDOWN_SECONDS = 120.0
+
+# DataDome's Android SDK holds one cookie store for the app lifetime and
+# serializes challenge handling. The source object itself is rebuilt for each
+# poll, so the equivalent cache belongs at module scope.
+_transport_lock = threading.RLock()
+_cached_session: Any | None = None
+_cached_profile: str | None = None
+_blocked_until = 0.0
+_browser_required = False
 
 # Generic sort -> Leboncoin (sort_by, sort_order).
 _SORT = {
@@ -75,18 +85,19 @@ _CONDITION = {
 }
 
 
-def _mobile_ua() -> str:
-    """A Leboncoin-app User-Agent: LBC;<OS>;<ver>;<model>;phone;<id>;wifi;<app>."""
-    if random.random() < 0.5:
-        ver = random.choice(["18.3", "18.5", "18.6", "26.0", "26.1"])
-        return f"LBC;iOS;{ver};iPhone;phone;{os.urandom(8).hex()};wifi;101.44.0"
-    ver = random.choice(["12", "13", "14", "15"])
-    model = random.choice(_ANDROID_MODELS)
-    return f"LBC;Android;{ver};{model};phone;{os.urandom(8).hex()};wifi;100.85.2"
-
-
 class DataDomeBlocked(RuntimeError):
     """Raised when the API answers with a DataDome challenge (HTTP 403)."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        challenge: bool = False,
+        retryable: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.challenge = challenge
+        self.retryable = retryable
 
 
 class LeboncoinSource(BaseSource):
@@ -137,72 +148,161 @@ class LeboncoinSource(BaseSource):
         return jar.get("datadome")
 
     def _post(self, body: dict) -> dict:
+        global _browser_required
+
+        if _browser_required:
+            return self._post_browser(body)
         if HAVE_CURL_CFFI:
-            return self._post_curl(body)
+            try:
+                return self._post_curl(body)
+            except DataDomeBlocked as exc:
+                if not exc.challenge:
+                    raise
+                logger.info(
+                    "Leboncoin requested a DataDome device check; switching to "
+                    "the persistent browser transport"
+                )
+                _browser_required = True
+                return self._post_browser(body)
         # Fallback path: httpx is TLS-blocked unless a valid cookie is supplied.
         dd = self._datadome_cookie()
         if not dd:
-            raise DataDomeBlocked(
-                "curl_cffi is not installed and no datadome cookie is available. "
-                "Install curl_cffi (the default engine) or export a datadome "
-                "cookie into cookies.txt."
-            )
+            return self._post_browser(body)
         return self._post_httpx(body, dd)
 
-    def _post_curl(self, body: dict) -> dict:
-        seed = self._datadome_cookie()  # try a supplied cookie first, if any
-        last = 0
-        for attempt in range(_MAX_RETRIES + 1):
-            session = self._new_curl_session(seed if attempt == 0 else None)
-            try:
-                resp = session.post(
-                    _SEARCH_URL, json=body,
-                    headers={"api_key": _API_KEY}, timeout=30.0,
-                )
-                last = resp.status_code
-                if resp.status_code == 200:
-                    return resp.json()
-                if resp.status_code != 403:
-                    raise DataDomeBlocked(f"HTTP {resp.status_code}")
-            finally:
-                try:
-                    session.close()
-                except Exception:  # noqa: BLE001
-                    pass
-            if attempt < _MAX_RETRIES:
-                logger.info(
-                    "Leboncoin 403 from DataDome; rotating identity (try %d/%d)",
-                    attempt + 1, _MAX_RETRIES,
-                )
-        raise DataDomeBlocked(
-            f"HTTP {last} after {_MAX_RETRIES} retries — the egress IP is likely "
-            "not trusted by DataDome (use a French residential/mobile line)."
+    def _post_browser(self, body: dict) -> dict:
+        from .leboncoin_browser import fetch_leboncoin_json
+
+        return fetch_leboncoin_json(
+            _WEB_BASE,
+            self._settings.leboncoin_browser_profile_dir,
+            body,
+            _API_KEY,
         )
 
-    def _new_curl_session(self, datadome: str | None):
-        session = cffi_requests.Session(impersonate=random.choice(_IMPERSONATIONS))
-        session.headers.update({
-            "User-Agent": _mobile_ua(),
-            "Accept": "application/json",
-            "Sec-Fetch-Dest": "empty",
-            "Sec-Fetch-Mode": "cors",
-            "Sec-Fetch-Site": "same-site",
-        })
+    def _post_curl(self, body: dict) -> dict:
+        global _blocked_until, _cached_profile, _cached_session
+
+        with _transport_lock:
+            remaining = _blocked_until - time.monotonic()
+            if remaining > 0:
+                raise DataDomeBlocked(
+                    f"DataDome cooldown active ({remaining:.0f}s remaining)"
+                )
+
+            # First reuse the last identity that completed a search. The SDK in
+            # the Android app follows the same model and replaces its cookie
+            # whenever a response supplies a newer one.
+            if _cached_session is not None:
+                resp = self._search_request(_cached_session, body)
+                if resp.status_code == 200:
+                    return resp.json()
+                if not _is_datadome_challenge(resp):
+                    raise DataDomeBlocked(f"HTTP {resp.status_code}")
+                logger.info(
+                    "Leboncoin cached %s identity was challenged (X-DD-B=%s)",
+                    _cached_profile,
+                    _challenge_marker(resp),
+                )
+                _close_session(_cached_session)
+                _cached_session = None
+                _cached_profile = None
+                raise DataDomeBlocked(
+                    f"HTTP {resp.status_code} DataDome device check",
+                    challenge=True,
+                )
+
+            seed = self._datadome_cookie()
+            last_status = 0
+            last_marker: str | None = None
+            for attempt in range(_MAX_FRESH_ATTEMPTS):
+                profile = random.choice(_MOBILE_IMPERSONATIONS)
+                session = self._new_curl_session(seed if attempt == 0 else None, profile)
+                try:
+                    self._warm_up(session)
+                    resp = self._search_request(session, body)
+                    last_status = resp.status_code
+                    last_marker = _challenge_marker(resp)
+                    if resp.status_code == 200:
+                        _cached_session = session
+                        _cached_profile = profile
+                        return resp.json()
+                    if _is_datadome_challenge(resp):
+                        raise DataDomeBlocked(
+                            f"HTTP {resp.status_code} DataDome device check",
+                            challenge=True,
+                        )
+                    raise DataDomeBlocked(f"HTTP {resp.status_code}")
+                except DataDomeBlocked as exc:
+                    if exc.challenge:
+                        raise
+                    if not exc.retryable:
+                        raise
+                    last_status = getattr(exc, "status_code", last_status)
+                    logger.info("Leboncoin identity rejected during warm-up: %s", exc)
+                finally:
+                    if session is not _cached_session:
+                        _close_session(session)
+
+                if attempt + 1 < _MAX_FRESH_ATTEMPTS:
+                    delay = random.uniform(
+                        _BACKOFF_BASE_SECONDS * (2**attempt),
+                        _BACKOFF_BASE_SECONDS * (2**attempt) * 1.75,
+                    )
+                    logger.info(
+                        "Leboncoin DataDome challenge (X-DD-B=%s); retrying a "
+                        "fresh mobile identity in %.1fs",
+                        last_marker,
+                        delay,
+                    )
+                    time.sleep(delay)
+
+            _blocked_until = time.monotonic() + _BLOCK_COOLDOWN_SECONDS
+            raise DataDomeBlocked(
+                f"HTTP {last_status or 403} DataDome challenge after "
+                f"{_MAX_FRESH_ATTEMPTS} paced attempts; pausing Leboncoin for "
+                f"{int(_BLOCK_COOLDOWN_SECONDS)}s",
+                challenge=bool(last_marker),
+            )
+
+    def _new_curl_session(self, datadome: str | None, profile: str):
+        session = cffi_requests.Session(impersonate=profile)
+        # Let curl_cffi generate the User-Agent and browser-controlled headers
+        # that match its TLS profile. DataDome's Android interceptor itself only
+        # forces Accept and merges its cookie into the existing cookie jar.
+        session.headers.update({"Accept": "application/json"})
         if datadome:
             session.cookies.set("datadome", datadome, domain=".leboncoin.fr")
-        else:
-            # Warm up so DataDome issues a datadome cookie to this TLS client.
-            try:
-                session.get(f"{_WEB_BASE}/", timeout=30.0)
-            except Exception as exc:  # noqa: BLE001 - warmup failure -> API 403 -> retry
-                logger.debug("Leboncoin warm-up failed: %s", exc)
         return session
+
+    def _warm_up(self, session) -> None:
+        """Require a clean homepage response before spending an API request."""
+        resp = session.get(f"{_WEB_BASE}/", timeout=30.0)
+        if resp.status_code != 200:
+            exc = DataDomeBlocked(
+                f"warm-up HTTP {resp.status_code}", retryable=True
+            )
+            exc.status_code = resp.status_code
+            raise exc
+        if not _session_cookie(session, "datadome"):
+            raise DataDomeBlocked(
+                "warm-up returned 200 without a datadome cookie",
+                retryable=True,
+            )
+
+    @staticmethod
+    def _search_request(session, body: dict):
+        return session.post(
+            _SEARCH_URL,
+            json=body,
+            headers={"api_key": _API_KEY},
+            timeout=30.0,
+        )
 
     def _post_httpx(self, body: dict, datadome: str) -> dict:
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
-            "User-Agent": _mobile_ua(),
             "api_key": _API_KEY,
             "Cookie": f"datadome={datadome}",
         }
@@ -243,6 +343,38 @@ class LeboncoinSource(BaseSource):
             shipping_options=detect_shipping(subject, body),
             posted_at=_parse_date(ad.get("first_publication_date")),
         )
+
+
+def _challenge_marker(response) -> str | None:
+    return response.headers.get("X-DD-B") or response.headers.get("X-SF-CC-X-dd-b")
+
+
+def _is_datadome_challenge(response) -> bool:
+    """Mirror the Android SDK's response gate before invoking DD handling."""
+    return response.status_code in (401, 403) and bool(_challenge_marker(response))
+
+
+def _close_session(session) -> None:
+    try:
+        session.close()
+    except Exception:  # noqa: BLE001 - best-effort transport cleanup
+        pass
+
+
+def _session_cookie(session, name: str) -> str | None:
+    """Read a cookie without assuming a particular curl_cffi cookie backend."""
+    try:
+        value = session.cookies.get(name)
+        return str(value) if value else None
+    except (AttributeError, KeyError):
+        pass
+    try:
+        for cookie in session.cookies.jar:
+            if cookie.name == name:
+                return str(cookie.value)
+    except (AttributeError, TypeError):
+        pass
+    return None
 
 
 def _first_price(price) -> float | None:

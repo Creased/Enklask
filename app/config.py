@@ -45,6 +45,7 @@ class Settings(BaseModel):
 
     # Leboncoin (unofficial)
     leboncoin_base_url: str = "https://api.leboncoin.fr"
+    leboncoin_browser_profile_dir: str = "data/leboncoin-camoufox-profile"
 
     # Shared cookies.txt file (Netscape format, e.g. from "Get cookies.txt LOCALLY").
     cookies_file: str = "data/cookies.txt"

@@ -169,10 +169,11 @@ parsers (no live network needed).
   completes the JavaScript challenge, and loads `/catalog`; the connector then
   parses its server-rendered Next.js payload. Docker runs the headed browser in
   Xvfb, so no window is displayed.
-- **Leboncoin** — set `ENABLE_LEBONCOIN=true`. Uses `curl_cffi` to impersonate a browser's
-  TLS fingerprint and self-mint a DataDome cookie, then queries the JSON search API — no
-  browser. Needs a reasonably trusted (French residential) egress IP; from a blocked IP it
-  reports an error and the other sources keep working.
+- **Leboncoin** — set `ENABLE_LEBONCOIN=true`. Reuses a coherent `curl_cffi` browser session
+  for lightweight searches. If DataDome requests its JavaScript device check, Enklask
+  switches to a persistent Camoufox session and performs the same JSON search in that real
+  browser context. The browser profile is stored under `data/` so its cookie survives
+  restarts; interactive CAPTCHAs are reported as an error and other sources keep working.
 
 ## Roadmap
 
