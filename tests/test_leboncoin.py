@@ -123,7 +123,7 @@ def _reset_leboncoin_transport(monkeypatch):
     monkeypatch.setattr(leboncoin, "_cached_session", None)
     monkeypatch.setattr(leboncoin, "_cached_profile", None)
     monkeypatch.setattr(leboncoin, "_blocked_until", 0.0)
-    monkeypatch.setattr(leboncoin, "_browser_required", False)
+    monkeypatch.setattr(leboncoin, "_browser_preferred_until", 0.0)
 
 
 def test_datadome_challenge_requires_status_and_marker():
@@ -160,48 +160,155 @@ def test_successful_transport_session_is_reused(monkeypatch):
     assert "User-Agent" not in session.headers
 
 
-def test_failed_warmups_are_paced_then_start_cooldown(monkeypatch):
-    sessions = [_Session([], get_status=403) for _ in range(2)]
-    sleeps = []
-    monkeypatch.setattr(
-        leboncoin.cffi_requests,
-        "Session",
-        lambda **_kwargs: sessions.pop(0),
-    )
-    monkeypatch.setattr(leboncoin.time, "sleep", sleeps.append)
+def test_warmup_challenge_short_circuits_to_browser(monkeypatch):
+    """A DataDome 403 on the warm-up GET must escalate to the browser, not
+    raise challenge=False (the headline bug the patch had)."""
+    from app.sources import leboncoin_browser
+
+    sessions = [_Session([], get_status=403)]
+    monkeypatch.setattr(leboncoin.cffi_requests, "Session", lambda **_k: sessions.pop(0))
     monkeypatch.setattr(leboncoin.time, "monotonic", lambda: 100.0)
-    monkeypatch.setattr(leboncoin.random, "uniform", lambda low, _high: low)
+    calls = []
+    monkeypatch.setattr(
+        leboncoin_browser,
+        "fetch_leboncoin_json",
+        lambda base, profile, body, key, proxy=None: calls.append((base, proxy))
+        or {"ads": [7]},
+    )
     source = LeboncoinSource()
     monkeypatch.setattr(source, "_datadome_cookie", lambda: None)
 
-    with pytest.raises(DataDomeBlocked, match="paced attempts"):
-        source._post_curl({})
-    assert sleeps == [leboncoin._BACKOFF_BASE_SECONDS]
+    assert source._post({"filters": {}}) == {"ads": [7]}
+    assert calls and calls[0][0] == "https://www.leboncoin.fr"
     assert leboncoin._blocked_until == 100.0 + leboncoin._BLOCK_COOLDOWN_SECONDS
+    assert leboncoin._browser_preferred_until == 100.0 + leboncoin._BROWSER_PREFER_SECONDS
+    # Only one curl identity is tried before the browser (no hammering).
+    assert sessions == []
 
-    with pytest.raises(DataDomeBlocked, match="cooldown active"):
+
+def test_cooldown_uses_browser_without_touching_curl(monkeypatch):
+    """During the curl cooldown, no Leboncoin network request is made; the
+    search goes straight to the browser."""
+    from app.sources import leboncoin_browser
+
+    monkeypatch.setattr(leboncoin.time, "monotonic", lambda: 50.0)
+    monkeypatch.setattr(leboncoin, "_blocked_until", 100.0)  # cooldown in the future
+
+    def _no_curl(**_k):
+        raise AssertionError("curl must not run during cooldown")
+
+    monkeypatch.setattr(leboncoin.cffi_requests, "Session", _no_curl)
+    called = []
+    monkeypatch.setattr(
+        leboncoin_browser,
+        "fetch_leboncoin_json",
+        lambda *a, **k: called.append(1) or {"ads": []},
+    )
+    source = LeboncoinSource()
+    monkeypatch.setattr(source, "_datadome_cookie", lambda: None)
+
+    assert source._post({}) == {"ads": []}
+    assert called
+
+
+def test_200_html_body_is_not_cached_and_escalates(monkeypatch):
+    """A 200 whose body is not JSON (DataDome soft challenge) must not poison
+    the cache and must route to the browser."""
+    from app.sources import leboncoin_browser
+
+    class _HtmlResp:
+        status_code = 200
+        headers: dict = {}
+
+        def json(self):
+            raise ValueError("not json")
+
+    session = _Session([_HtmlResp()])
+    monkeypatch.setattr(leboncoin.cffi_requests, "Session", lambda **_k: session)
+    monkeypatch.setattr(leboncoin.time, "monotonic", lambda: 0.0)
+    monkeypatch.setattr(
+        leboncoin_browser,
+        "fetch_leboncoin_json",
+        lambda *a, **k: {"ads": [1]},
+    )
+    source = LeboncoinSource()
+    monkeypatch.setattr(source, "_datadome_cookie", lambda: None)
+
+    assert source._post({}) == {"ads": [1]}
+    assert leboncoin._cached_session is None  # never cached the bad identity
+
+
+def test_cached_session_invalidated_on_markerless_error(monkeypatch):
+    """A previously-good cached session that starts returning a markerless
+    non-200 must be dropped, not reused forever."""
+    cached = _Session([_Response(200, {"ads": [1]})])
+    fresh = _Session([], get_status=500)
+    factory = [cached, fresh, fresh]
+    monkeypatch.setattr(leboncoin.cffi_requests, "Session", lambda **_k: factory.pop(0))
+    monkeypatch.setattr(leboncoin.time, "sleep", lambda *_a: None)
+    monkeypatch.setattr(leboncoin.time, "monotonic", lambda: 0.0)
+    source = LeboncoinSource()
+    monkeypatch.setattr(source, "_datadome_cookie", lambda: None)
+
+    assert source._post_curl({}) == {"ads": [1]}
+    assert leboncoin._cached_session is cached
+
+    cached.post_responses = [_Response(500, headers={})]  # now the identity dies
+    with pytest.raises(DataDomeBlocked):
         source._post_curl({})
+    assert leboncoin._cached_session is None
 
 
-def test_device_check_switches_to_persistent_browser(monkeypatch):
+def test_browser_failure_does_not_pin_and_surfaces_block(monkeypatch):
+    """If the browser is unavailable, a curl challenge surfaces the original
+    block (so other sources run) instead of latching to a dead transport."""
     from app.sources import leboncoin_browser
 
     source = LeboncoinSource()
     monkeypatch.setattr(
         source,
         "_post_curl",
-        lambda _body: (_ for _ in ()).throw(
-            DataDomeBlocked("device check", challenge=True)
-        ),
+        lambda _b: (_ for _ in ()).throw(DataDomeBlocked("device check", challenge=True)),
     )
-    calls = []
+
+    def _browser_unavailable(*_a, **_k):
+        raise leboncoin_browser.LeboncoinBrowserError("Camoufox is unavailable")
+
+    monkeypatch.setattr(leboncoin_browser, "fetch_leboncoin_json", _browser_unavailable)
+    monkeypatch.setattr(leboncoin.time, "monotonic", lambda: 0.0)
+
+    with pytest.raises(DataDomeBlocked):
+        source._post({"filters": {}})
+    assert leboncoin._browser_preferred_until == 0.0  # never pinned to the browser
+
+
+def test_proxy_is_passed_to_curl_and_browser(monkeypatch):
+    from app.sources import leboncoin_browser
+
+    monkeypatch.setenv("LEBONCOIN_PROXY", "http://proxy.example:8080")
+    captured = {}
+
+    def _capture_session(**kwargs):
+        captured["proxies"] = kwargs.get("proxies")
+        return _Session([_Response(200, {"ads": []})])
+
+    monkeypatch.setattr(leboncoin.cffi_requests, "Session", _capture_session)
+    monkeypatch.setattr(leboncoin.time, "monotonic", lambda: 0.0)
+    source = LeboncoinSource()
+    monkeypatch.setattr(source, "_datadome_cookie", lambda: None)
+
+    source._post_curl({})
+    assert captured["proxies"] == {
+        "https": "http://proxy.example:8080",
+        "http": "http://proxy.example:8080",
+    }
+
+    browser_proxy = []
     monkeypatch.setattr(
         leboncoin_browser,
         "fetch_leboncoin_json",
-        lambda base, profile, body, key: calls.append((base, profile, body, key))
+        lambda base, profile, body, key, proxy=None: browser_proxy.append(proxy)
         or {"ads": []},
     )
-
-    assert source._post({"filters": {}}) == {"ads": []}
-    assert leboncoin._browser_required
-    assert calls[0][0] == "https://www.leboncoin.fr"
+    source._post_browser({})
+    assert browser_proxy == ["http://proxy.example:8080"]

@@ -46,6 +46,11 @@ class Settings(BaseModel):
     # Leboncoin (unofficial)
     leboncoin_base_url: str = "https://api.leboncoin.fr"
     leboncoin_browser_profile_dir: str = "data/leboncoin-camoufox-profile"
+    # Optional egress proxy for Leboncoin ONLY (curl_cffi + Camoufox). Keep
+    # Leboncoin's DataDome traffic off a residential IP you also browse from,
+    # or its bot score taints that IP for every device on it. Also honored via
+    # the LEBONCOIN_PROXY / LBC_PROXY environment variables.
+    leboncoin_proxy: str | None = None
 
     # Shared cookies.txt file (Netscape format, e.g. from "Get cookies.txt LOCALLY").
     cookies_file: str = "data/cookies.txt"

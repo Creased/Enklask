@@ -42,9 +42,12 @@ class LeboncoinBrowserError(RuntimeError):
 class LeboncoinBrowserBroker:
     """Serialize Leboncoin browser requests onto one persistent worker thread."""
 
-    def __init__(self, base_url: str, profile_dir: str | Path) -> None:
+    def __init__(
+        self, base_url: str, profile_dir: str | Path, proxy: str | None = None
+    ) -> None:
         self._base = base_url.rstrip("/")
         self._profile_dir = Path(profile_dir)
+        self._proxy = proxy
         self._executor = ThreadPoolExecutor(
             max_workers=1, thread_name_prefix="leboncoin-browser"
         )
@@ -98,16 +101,24 @@ class LeboncoinBrowserBroker:
             "headless": "virtual" if os.name != "nt" else False,
             "locale": "fr-FR",
         }
+        if self._proxy:
+            options["proxy"] = {"server": self._proxy}
         if os.name == "nt":
             binary = Path(launch_path(camoufox_path(False))).resolve()
             options["executable_path"] = str(binary)
-        self._camoufox = Camoufox(**options)
-        self._context = self._camoufox.__enter__()
-        self._page = self._context.pages[0] if self._context.pages else None
-        if self._page is None:
-            self._page = self._context.new_page()
-        self._page.set_default_navigation_timeout(60_000)
-        self._page.set_default_timeout(45_000)
+        # Clean up on partial failure so a half-created Camoufox process is not
+        # orphaned (the next call would otherwise launch a second one).
+        try:
+            self._camoufox = Camoufox(**options)
+            self._context = self._camoufox.__enter__()
+            self._page = self._context.pages[0] if self._context.pages else None
+            if self._page is None:
+                self._page = self._context.new_page()
+            self._page.set_default_navigation_timeout(60_000)
+            self._page.set_default_timeout(45_000)
+        except Exception:
+            self._reset()
+            raise
         self._warmed = False
 
     def _warm_up(self) -> None:
@@ -187,12 +198,13 @@ def fetch_leboncoin_json(
     profile_dir: str | Path,
     body: dict,
     api_key: str,
+    proxy: str | None = None,
 ) -> dict:
     """Execute a search in the process-wide persistent browser."""
     global _broker
     with _broker_lock:
         if _broker is None:
-            _broker = LeboncoinBrowserBroker(base_url, profile_dir)
+            _broker = LeboncoinBrowserBroker(base_url, profile_dir, proxy=proxy)
         broker = _broker
     return broker.search(body, api_key)
 

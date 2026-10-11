@@ -170,10 +170,17 @@ parsers (no live network needed).
   parses its server-rendered Next.js payload. Docker runs the headed browser in
   Xvfb, so no window is displayed.
 - **Leboncoin** — set `ENABLE_LEBONCOIN=true`. Reuses a coherent `curl_cffi` browser session
-  for lightweight searches. If DataDome requests its JavaScript device check, Enklask
-  switches to a persistent Camoufox session and performs the same JSON search in that real
-  browser context. The browser profile is stored under `data/` so its cookie survives
-  restarts; interactive CAPTCHAs are reported as an error and other sources keep working.
+  for lightweight searches. If DataDome challenges it (at the homepage warm-up or the search),
+  Enklask hands that search to a persistent Camoufox session that runs the JavaScript device
+  check and performs the same JSON search in that real browser context, then prefers the
+  browser briefly instead of re-triggering challenges curl cannot solve. The browser profile
+  is stored under `data/` so its cookie survives restarts; interactive CAPTCHAs are reported
+  as an error and other sources keep working.
+  > ⚠️ **Run Leboncoin through a separate egress.** Set `LEBONCOIN_PROXY` (or `leboncoin_proxy`
+  > in `data/config.json`) to a French residential/VPN proxy. Scraping DataDome from a
+  > residential IP you also browse from can drop that IP's bot score and get the official
+  > Leboncoin app blocked on every device sharing it. The proxy applies to both the curl and
+  > Camoufox transports; everything else stays direct.
 
 ## Roadmap
 
