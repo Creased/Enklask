@@ -21,6 +21,18 @@ logger = logging.getLogger(__name__)
 LAUNCH_LOCK = threading.Lock()
 LAUNCH_LOCK_TIMEOUT_SECONDS = 120.0
 
+# Firefox prefs that stop the persistent profiles from rewriting disk every poll
+# (HTTP cache, history, favicons, frequent session snapshots). Cookies and site
+# storage are untouched: they hold the Cloudflare/DataDome clearance.
+LOW_WRITE_PREFS = {
+    "browser.cache.disk.enable": False,
+    "browser.cache.memory.capacity": 65536,  # KB; bounds the in-memory cache
+    "places.history.enabled": False,
+    "browser.chrome.site_icons": False,
+    "browser.sessionstore.resume_from_crash": False,
+    "browser.sessionstore.interval": 600000,
+}
+
 
 def _children_map() -> dict[int, list[int]]:
     children: dict[int, list[int]] = {}

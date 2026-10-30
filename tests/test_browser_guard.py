@@ -139,6 +139,41 @@ def test_failed_launch_kills_leftovers_and_pauses_relaunches(
     assert _FailingCamoufox.launches == 1
 
 
+class _RecordingCamoufox:
+    options: dict = {}
+
+    def __init__(self, **options) -> None:
+        type(self).options = options
+
+    def __enter__(self):
+        page = type(
+            "Page", (), {"set_default_navigation_timeout": lambda *_: None,
+                         "set_default_timeout": lambda *_: None},
+        )()
+        return type("Context", (), {"pages": [page]})()
+
+    def __exit__(self, *_args):
+        return None
+
+
+@pytest.mark.parametrize("module", [vinted_browser, leboncoin_browser])
+def test_browsers_launch_with_low_write_prefs(monkeypatch, tmp_path, module):
+    monkeypatch.setattr(module, "HAVE_CAMOUFOX", True)
+    monkeypatch.setattr(module, "Camoufox", _RecordingCamoufox)
+    broker_cls = (
+        module.VintedBrowserBroker
+        if module is vinted_browser
+        else module.LeboncoinBrowserBroker
+    )
+
+    broker_cls("https://example.test", tmp_path)._ensure_browser()
+
+    prefs = _RecordingCamoufox.options["firefox_user_prefs"]
+    assert prefs["browser.cache.disk.enable"] is False
+    assert prefs["places.history.enabled"] is False
+    assert prefs["browser.sessionstore.resume_from_crash"] is False
+
+
 @pytest.mark.parametrize(
     ("module", "method", "args", "error"),
     [

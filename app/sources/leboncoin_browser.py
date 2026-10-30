@@ -21,6 +21,7 @@ from pathlib import Path
 from .browser_guard import (
     LAUNCH_LOCK,
     LAUNCH_LOCK_TIMEOUT_SECONDS,
+    LOW_WRITE_PREFS,
     LaunchBackoff,
     child_pids,
     kill_tree,
@@ -139,6 +140,7 @@ class LeboncoinBrowserBroker:
             "user_data_dir": str(self._profile_dir.resolve()),
             "headless": "virtual" if os.name != "nt" else False,
             "locale": "fr-FR",
+            "firefox_user_prefs": dict(LOW_WRITE_PREFS),
         }
         if self._proxy:
             options["proxy"] = {"server": self._proxy}

@@ -20,6 +20,7 @@ from urllib.parse import urlencode
 from .browser_guard import (
     LAUNCH_LOCK,
     LAUNCH_LOCK_TIMEOUT_SECONDS,
+    LOW_WRITE_PREFS,
     LaunchBackoff,
     child_pids,
     kill_tree,
@@ -138,6 +139,7 @@ class VintedBrowserBroker:
             # Linux uses a real headed browser in a private Xvfb display.
             "headless": "virtual" if os.name != "nt" else False,
             "locale": "fr-FR",
+            "firefox_user_prefs": dict(LOW_WRITE_PREFS),
         }
         if os.name == "nt":
             # Microsoft Store Python virtualizes LocalAppData. Resolve the
