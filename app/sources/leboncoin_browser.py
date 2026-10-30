@@ -29,6 +29,7 @@ from .browser_guard import (
 
 try:
     from camoufox.pkgman import camoufox_path, launch_path
+    from camoufox import DefaultAddons
     from camoufox.sync_api import Camoufox
     from playwright.sync_api import Error as PlaywrightError
     from playwright.sync_api import TimeoutError as PlaywrightTimeout
@@ -141,6 +142,8 @@ class LeboncoinBrowserBroker:
             "headless": "virtual" if os.name != "nt" else False,
             "locale": "fr-FR",
             "firefox_user_prefs": dict(LOW_WRITE_PREFS),
+            # uBlock Origin rewrites its IndexedDB filter cache non-stop.
+            "exclude_addons": [DefaultAddons.UBO],
         }
         if self._proxy:
             options["proxy"] = {"server": self._proxy}

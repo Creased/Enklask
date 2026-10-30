@@ -172,6 +172,7 @@ def test_browsers_launch_with_low_write_prefs(monkeypatch, tmp_path, module):
     assert prefs["browser.cache.disk.enable"] is False
     assert prefs["places.history.enabled"] is False
     assert prefs["browser.sessionstore.resume_from_crash"] is False
+    assert module.DefaultAddons.UBO in _RecordingCamoufox.options["exclude_addons"]
 
 
 @pytest.mark.parametrize(
