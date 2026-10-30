@@ -13,8 +13,17 @@ import logging
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from pathlib import Path
 from urllib.parse import urlencode
+
+from .browser_guard import (
+    LAUNCH_LOCK,
+    LAUNCH_LOCK_TIMEOUT_SECONDS,
+    LaunchBackoff,
+    child_pids,
+    kill_tree,
+)
 
 try:
     from camoufox.pkgman import camoufox_path, launch_path
@@ -33,6 +42,8 @@ logger = logging.getLogger(__name__)
 
 _HOME_READY_SELECTOR = 'input[placeholder*="Rechercher"]'
 _CHALLENGE_TITLES = ("just a moment", "un instant", "please wait")
+# Above a navigation plus warm-up retry (~4 min); past it the browser is hung.
+_CALL_TIMEOUT_SECONDS = 300.0
 
 
 class VintedBrowserError(RuntimeError):
@@ -53,14 +64,32 @@ class VintedBrowserBroker:
         self._page = None
         self._warmed = False
         self._closed = False
+        self._owned_pids: set[int] = set()
+        self._launch_baseline: set[int] | None = None
+        self._backoff = LaunchBackoff()
 
     def fetch(self, path: str, params: dict | None = None) -> str:
         """Return fully rendered HTML, safe to call from any application thread."""
         if self._closed:
             raise VintedBrowserError("Vinted browser broker is closed")
-        return self._executor.submit(
-            self._fetch_on_browser_thread, path, params
-        ).result()
+        future = self._executor.submit(self._fetch_on_browser_thread, path, params)
+        try:
+            return future.result(timeout=_CALL_TIMEOUT_SECONDS)
+        except FutureTimeout:
+            future.cancel()
+            # Killing the browser makes the stuck Playwright call fail, which
+            # frees the worker thread; the next fetch relaunches cleanly.
+            kill_tree(self._browser_pids())
+            raise VintedBrowserError(
+                f"Vinted browser hung for {_CALL_TIMEOUT_SECONDS:.0f}s; killed it"
+            ) from None
+
+    def _browser_pids(self) -> set[int]:
+        pids = set(self._owned_pids)
+        baseline = self._launch_baseline
+        if baseline is not None:
+            pids |= child_pids() - baseline
+        return pids
 
     def close(self) -> None:
         if self._closed:
@@ -70,6 +99,7 @@ class VintedBrowserBroker:
             self._executor.submit(self._reset).result(timeout=15)
         except Exception:  # noqa: BLE001 - interpreter/application shutdown
             logger.debug("Could not close Vinted browser cleanly", exc_info=True)
+            kill_tree(self._browser_pids())
         self._executor.shutdown(wait=False, cancel_futures=True)
 
     def _fetch_on_browser_thread(self, path: str, params: dict | None) -> str:
@@ -94,6 +124,13 @@ class VintedBrowserBroker:
             raise VintedBrowserError(
                 "Camoufox is unavailable; install project requirements"
             )
+        if self._camoufox is not None:
+            self._reset()
+        remaining = self._backoff.remaining()
+        if remaining:
+            raise VintedBrowserError(
+                f"Vinted browser relaunch paused for {remaining:.0f}s after a failed launch"
+            )
         self._profile_dir.mkdir(parents=True, exist_ok=True)
         options = {
             "persistent_context": True,
@@ -107,13 +144,30 @@ class VintedBrowserBroker:
             # installed binary so the child browser process sees the real path.
             binary = Path(launch_path(camoufox_path(False))).resolve()
             options["executable_path"] = str(binary)
-        self._camoufox = Camoufox(**options)
-        self._context = self._camoufox.__enter__()
-        self._page = self._context.pages[0] if self._context.pages else None
-        if self._page is None:
-            self._page = self._context.new_page()
-        self._page.set_default_navigation_timeout(60_000)
-        self._page.set_default_timeout(45_000)
+        if not LAUNCH_LOCK.acquire(timeout=LAUNCH_LOCK_TIMEOUT_SECONDS):
+            raise VintedBrowserError("Another browser launch is stuck")
+        try:
+            self._launch_baseline = child_pids()
+            try:
+                self._camoufox = Camoufox(**options)
+                self._context = self._camoufox.__enter__()
+                self._page = self._context.pages[0] if self._context.pages else None
+                if self._page is None:
+                    self._page = self._context.new_page()
+                self._page.set_default_navigation_timeout(60_000)
+                self._page.set_default_timeout(45_000)
+            except Exception:
+                # Camoufox does not stop Xvfb when the launch itself fails.
+                self._owned_pids = child_pids() - self._launch_baseline
+                self._reset()
+                delay = self._backoff.failed()
+                logger.warning("Vinted browser launch failed; next try in %.0fs", delay)
+                raise
+            self._owned_pids = child_pids() - self._launch_baseline
+        finally:
+            self._launch_baseline = None
+            LAUNCH_LOCK.release()
+        self._backoff.succeeded()
         self._warmed = False
 
     def _warm_up(self) -> None:
@@ -151,6 +205,8 @@ class VintedBrowserBroker:
                 self._camoufox.__exit__(None, None, None)
             except Exception:  # noqa: BLE001
                 logger.debug("Vinted browser context close failed", exc_info=True)
+        kill_tree(self._owned_pids)
+        self._owned_pids = set()
         self._camoufox = self._context = self._page = None
         self._warmed = False
 
